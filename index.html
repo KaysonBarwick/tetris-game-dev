@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title> Asteroids </title> 
+    <link rel="stylesheet" type="text/css" href="styles/game.css">
+</head>
+
+<body>
+    <div id='game'>
+        <!-- ~~~~~~~ Main Menu ~~~~~~~ -->
+        <div id='screen-main-menu' class='screen'>
+            <h1 class="title"> Tetris </p>
+            <ul class="menu">
+                <li> <button id='button-start'> Start game </button>       </li>
+                <li> <button id='button-highscores'> High Scores </button> </li>
+                <li> <button id='button-options'> Help </button>        </li>
+                <li> <button id='button-credits'> Credits </button>        </li>
+            </ul>    
+        </div>
+
+        <!-- ~~~~~~~ Highscores ~~~~~~~ -->
+        <div id='screen-highscores' class='screen'>
+            <h1 class="title"> Highscores </h1>
+            <div class="title" id='highscores'></div>
+            <ul class="menu">
+                <li> <button id='button-back-highscores'> Main Menu </button> </li>
+            </ul>
+        </div>
+
+        <!-- ~~~~~~~ Options ~~~~~~~ -->
+        <div id='screen-options' class='screen'>
+            <h1 class="title"> Help </h1>
+            <h1 class="title"> Arrow Keys to move </h1>
+            <h1 class="title"> 'z' to hyerspace </h1>
+            <h1 class="title"> spacebar to shoot </h1>
+            <ul class="menu">
+                <li> <button id='button-back-options'> Main Menu </button> </li>
+            </ul>
+        </div>
+
+        <!-- ~~~~~~~ Credits ~~~~~~~ -->
+        <div id='screen-credits' class='screen'>
+            <h1 class="title"> Created by: Kayson Barwick </h1>
+            <h1 class="title"> For other credits see file ./assets/credits.txt </h1>
+            <ul class="menu">
+                <li> <button id='button-back-credits'> Main Menu </button> </li>
+            </ul>
+        </div>
+
+        <!-- ~~~~~~~ Game ~~~~~~~ -->
+        <div id='screen-game' class='screen'>
+            <div id='hud'>
+                <div id='div-timer'></div>
+                <div id='div-level'></div>
+                <div id='div-score'></div>
+                <div id='div-hyper'>
+                    <div id='div-hyper-bar'></div>
+                </div>
+            </div>
+            <canvas id='canvas-game' height='1000' width='1000'></canvas>
+        </div>
+
+        <!-- ~~~~~~~ Game - pause~~~~~~~ -->
+        <div id='sub-screen-pause' class='screen'>
+            <div class='sub-screen'>
+                <h1 class="title"> Paused </p>
+                <ul class="menu">
+                    <li> <button id='button-resume'> Resume </button> </li>
+                    <li> <button id='button-quit'> Quit </button>     </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ~~~~~~~ Game - gameover ~~~~~~~ -->
+        <div id='sub-screen-gameover' class='screen'>
+            <div class='sub-screen'>
+                <h1 class="title"> Game Over </p>
+                <div id="score-final" class="title"> Your score was: </div>
+                <ul class="menu">
+                    <li> <button id='button-highscores2'> Highscores </button> </li>
+                    <li> <button id='button-replay'> Play Again </button>      </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script data-main="out/game" src="server/require.js"></script>
+</body>
+</html>
