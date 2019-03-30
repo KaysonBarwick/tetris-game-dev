@@ -6,8 +6,11 @@ import Input from './utils/input';
 import Score from './utils/scores';
 import Timer from './utils/timer';
 import Particles from './graphics/particles';
-import Sprite from './graphics/sprite-sheet';
 import Animation from './graphics/animated-model';
+
+import Block, { BlockTypes } from './objects/block';
+import BlockRenderer from './render/block_renderer';
+import BlockAnimator from './render/block_animator';
 
 namespace Game {
 
@@ -18,8 +21,22 @@ namespace Game {
     let input = new Input();
     let timer = new Timer('div-timer');
 
-    let sprite = new Sprite('./assets/blocks.png', 7);
-    let animation = new Animation('./assets/blocks/green_pop_animation.png', 8, [200,200,200,200,200,200,200,10000]);
+    let block_renderer = new BlockRenderer();
+    let block_animator = new BlockAnimator();
+
+    let block = new Block(BlockTypes.I, {x: 1, y: 1});
+    let block2 = new Block(BlockTypes.J, {x: 2, y: 1});
+    let block3 = new Block(BlockTypes.S, {x: 3, y: 1});
+    let block4 = new Block(BlockTypes.Z, {x: 4, y: 1});
+    let block5 = new Block(BlockTypes.L, {x: 5, y: 1});
+    let block6 = new Block(BlockTypes.O, {x: 6, y: 1});
+    let block7 = new Block(BlockTypes.T, {x: 7, y: 1});
+    block_animator.popBlock(block2);
+    block_animator.popBlock(block3);
+    block_animator.popBlock(block4);
+    block_animator.popBlock(block5);
+    block_animator.popBlock(block6);
+    block_animator.popBlock(block7);
 
     //input.register_hold('ArrowUp', () => player.thrust(elapsedTime));
     //input.register_hold('ArrowLeft', () => player.turnLeft(elapsedTime));
@@ -58,20 +75,14 @@ namespace Game {
     function update(elapsedTime: DOMHighResTimeStamp){
         // Update Objects
         Particles.update(elapsedTime);
+        block_animator.update(elapsedTime);
         timer.updateTime(elapsedTime);
-        animation.update(elapsedTime);
     }
 
     function render(){
         Graphics.clear();
-        sprite.render({center: {x: 10, y: 10}, size: {width: 10, height: 10}}, 0);
-        sprite.render({center: {x: 20, y: 20}, size: {width: 10, height: 10}}, 1);
-        sprite.render({center: {x: 30, y: 30}, size: {width: 10, height: 10}}, 2);
-        sprite.render({center: {x: 40, y: 40}, size: {width: 10, height: 10}}, 3);
-        sprite.render({center: {x: 50, y: 50}, size: {width: 10, height: 10}}, 4);
-        sprite.render({center: {x: 60, y: 60}, size: {width: 10, height: 10}}, 5);
-        sprite.render({center: {x: 500, y: 500}, size: {width: 100, height: 100}}, 6);
-        animation.render({center: {x: 80, y: 80}, size: {width: 20, height: 20}});
+        block_animator.render();
+        block_renderer.render(block);
         Particles.render();
     }
 

@@ -6,7 +6,7 @@ namespace Graphics {
         width: number;
         height: number;
     }
-    
+
     export function getBoardDim(): BoardDim {
         return { width: canvas.width, height: canvas.height };
     }

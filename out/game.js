@@ -9,6 +9,19 @@ var __assign = (this && this.__assign) || function () {
     };
     return __assign.apply(this, arguments);
 };
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
 var Graphics;
 (function (Graphics) {
     Graphics.canvas = document.getElementById('canvas-game');
@@ -184,7 +197,7 @@ define("settings", ["require", "exports"], function (require, exports) {
     var settings = {
         board: { height: 20, width: 10 },
         board_offset: 82,
-        block_size: 10
+        block_size: 100
     };
     exports["default"] = settings;
 });
@@ -519,6 +532,120 @@ define("graphics/particles", ["require", "exports", "graphics/particle-system"],
     var particles = new Particles();
     exports["default"] = particles;
 });
+define("objects/object", ["require", "exports"], function (require, exports) {
+    "use strict";
+    exports.__esModule = true;
+    var Object = /** @class */ (function () {
+        function Object() {
+        }
+        Object.prototype.getCenter = function () {
+            return __assign({}, this.center);
+        };
+        Object.prototype.getSize = function () {
+            return __assign({}, this.size);
+        };
+        Object.prototype.getRotation = function () {
+            return this.rotation;
+        };
+        return Object;
+    }());
+    exports["default"] = Object;
+});
+define("graphics/animated-model", ["require", "exports"], function (require, exports) {
+    "use strict";
+    exports.__esModule = true;
+    var AnimatedModel = /** @class */ (function () {
+        function AnimatedModel(object, src, spriteCount, spriteTime, times) {
+            if (times === void 0) { times = null; }
+            var _this = this;
+            this.object = object;
+            this.spriteCount = spriteCount;
+            this.spriteTime = spriteTime;
+            this.times = times;
+            this.animationTime = 0;
+            this.subImageIndex = 0;
+            this.count = 0;
+            this.image = new Graphics.Texture({
+                src: src,
+                center: { x: 0, y: 0 },
+                subTextureIndex: 0,
+                onload: function () { _this.image.spec.subTextureWidth = _this.image.getWidth() / _this.spriteCount; console.log(_this.image); }
+            });
+        }
+        AnimatedModel.prototype.isDone = function () {
+            return this.count >= this.times;
+        };
+        AnimatedModel.prototype.update = function (elapsedTime) {
+            this.animationTime += elapsedTime;
+            if (this.animationTime >= this.spriteTime[this.subImageIndex]) {
+                this.animationTime -= this.spriteTime[this.subImageIndex];
+                this.subImageIndex += 1;
+                this.subImageIndex = this.subImageIndex % this.spriteCount;
+                if (this.subImageIndex == 0) {
+                    this.count++;
+                }
+            }
+        };
+        AnimatedModel.prototype.render = function () {
+            this.image.spec.center = this.object.getCenter();
+            this.image.spec.rotation = this.object.getRotation();
+            this.image.spec.size = this.object.getSize();
+            this.image.spec.subTextureIndex = this.subImageIndex;
+            this.image.draw();
+        };
+        return AnimatedModel;
+    }());
+    exports["default"] = AnimatedModel;
+});
+define("objects/block", ["require", "exports", "settings", "objects/object"], function (require, exports, settings_1, object_1) {
+    "use strict";
+    exports.__esModule = true;
+    var BlockTypes;
+    (function (BlockTypes) {
+        BlockTypes[BlockTypes["L"] = 0] = "L";
+        BlockTypes[BlockTypes["I"] = 1] = "I";
+        BlockTypes[BlockTypes["O"] = 2] = "O";
+        BlockTypes[BlockTypes["T"] = 3] = "T";
+        BlockTypes[BlockTypes["S"] = 4] = "S";
+        BlockTypes[BlockTypes["J"] = 5] = "J";
+        BlockTypes[BlockTypes["Z"] = 6] = "Z";
+    })(BlockTypes = exports.BlockTypes || (exports.BlockTypes = {}));
+    var Block = /** @class */ (function (_super) {
+        __extends(Block, _super);
+        function Block(type, index) {
+            var _this = _super.call(this) || this;
+            _this.type = type;
+            _this.index = index;
+            return _this;
+        }
+        Block.prototype.getCenter = function () {
+            return { x: this.getIndex().x * settings_1["default"].block_size, y: this.getIndex().y * settings_1["default"].block_size };
+        };
+        Block.prototype.getSize = function () {
+            return { height: settings_1["default"].block_size, width: settings_1["default"].block_size };
+        };
+        Block.prototype.fall = function () {
+            this.index.y--;
+            return true;
+        };
+        Block.prototype.moveRight = function () {
+            this.index.x++;
+            return true;
+        };
+        Block.prototype.moveLeft = function () {
+            this.index.x--;
+            return true;
+        };
+        Block.prototype.getType = function () {
+            return this.type;
+        };
+        Block.prototype.getIndex = function () {
+            return this.index;
+        };
+        return Block;
+    }(object_1["default"]));
+    exports["default"] = Block;
+});
 define("graphics/sprite-sheet", ["require", "exports"], function (require, exports) {
     "use strict";
     exports.__esModule = true;
@@ -544,45 +671,65 @@ define("graphics/sprite-sheet", ["require", "exports"], function (require, expor
     }());
     exports["default"] = SpriteSheet;
 });
-define("graphics/animated-model", ["require", "exports"], function (require, exports) {
+define("render/block_renderer", ["require", "exports", "graphics/sprite-sheet"], function (require, exports, sprite_sheet_1) {
     "use strict";
     exports.__esModule = true;
-    var AnimatedModel = /** @class */ (function () {
-        function AnimatedModel(src, spriteCount, spriteTime) {
-            var _this = this;
-            this.spriteCount = spriteCount;
-            this.spriteTime = spriteTime;
-            this.animationTime = 0;
-            this.subImageIndex = 0;
-            this.image = new Graphics.Texture({
-                src: src,
-                center: { x: 0, y: 0 },
-                subTextureIndex: 0,
-                onload: function () { _this.image.spec.subTextureWidth = _this.image.getWidth() / _this.spriteCount; console.log(_this.image); }
-            });
+    var BlockRenderer = /** @class */ (function () {
+        function BlockRenderer() {
+            this.sprites = new sprite_sheet_1["default"]('./assets/blocks.png', 7);
         }
-        AnimatedModel.prototype.update = function (elapsedTime) {
-            this.animationTime += elapsedTime;
-            if (this.animationTime >= this.spriteTime[this.subImageIndex]) {
-                this.animationTime -= this.spriteTime[this.subImageIndex];
-                this.subImageIndex += 1;
-                this.subImageIndex = this.subImageIndex % this.spriteCount;
-            }
+        BlockRenderer.prototype.render = function (block) {
+            this.sprites.render({
+                center: block.getCenter(),
+                size: block.getSize()
+            }, block.getType());
         };
-        AnimatedModel.prototype.render = function (model) {
-            this.image.spec.center = __assign({}, model.center);
-            this.image.spec.rotation = model.rotation;
-            this.image.spec.size = __assign({}, model.size);
-            this.image.spec.subTextureIndex = this.subImageIndex;
-            this.image.draw();
-        };
-        return AnimatedModel;
+        return BlockRenderer;
     }());
-    exports["default"] = AnimatedModel;
+    exports["default"] = BlockRenderer;
+});
+define("render/block_animator", ["require", "exports", "graphics/animated-model"], function (require, exports, animated_model_1) {
+    "use strict";
+    exports.__esModule = true;
+    var BlockRenderer = /** @class */ (function () {
+        function BlockRenderer() {
+            this.pop_frames = 8;
+            this.time_per_frame = [200, 200, 200, 200, 200, 200, 200, 250];
+            this.sprites = [
+                './assets/blocks/green_pop_animation.png',
+                './assets/blocks/purple_pop_animation.png',
+                './assets/blocks/red_pop_animation.png',
+                './assets/blocks/yellow_pop_animation.png',
+                './assets/blocks/blue_pop_animation.png',
+                './assets/blocks/dark_blue_pop_animation.png',
+                './assets/blocks/grey_pop_animation.png',
+            ];
+            this.popBlocks = [];
+        }
+        BlockRenderer.prototype.popBlock = function (block) {
+            this.popBlocks.push(new animated_model_1["default"](block, this.sprites[block.getType()], this.pop_frames, this.time_per_frame, 1));
+        };
+        BlockRenderer.prototype.update = function (elapsed_time) {
+            var _this = this;
+            this.popBlocks.forEach(function (animator, index) {
+                animator.update(elapsed_time);
+                if (animator.isDone()) {
+                    _this.popBlocks.splice(index, 1);
+                }
+            });
+        };
+        BlockRenderer.prototype.render = function () {
+            this.popBlocks.forEach(function (animator) {
+                animator.render();
+            });
+        };
+        return BlockRenderer;
+    }());
+    exports["default"] = BlockRenderer;
 });
 /// <reference path="./graphics/graphics.ts" />
 /// <reference path="./utils/screens.ts" />
-define("game", ["require", "exports", "utils/input", "utils/scores", "utils/timer", "graphics/particles", "graphics/sprite-sheet", "graphics/animated-model"], function (require, exports, input_1, scores_1, timer_1, particles_1, sprite_sheet_1, animated_model_1) {
+define("game", ["require", "exports", "utils/input", "utils/scores", "utils/timer", "graphics/particles", "objects/block", "render/block_renderer", "render/block_animator"], function (require, exports, input_1, scores_1, timer_1, particles_1, block_1, block_renderer_1, block_animator_1) {
     "use strict";
     exports.__esModule = true;
     var Game;
@@ -592,8 +739,21 @@ define("game", ["require", "exports", "utils/input", "utils/scores", "utils/time
         var elapsedTime = 0;
         var input = new input_1["default"]();
         var timer = new timer_1["default"]('div-timer');
-        var sprite = new sprite_sheet_1["default"]('./assets/blocks.png', 7);
-        var animation = new animated_model_1["default"]('./assets/blocks/green_pop_animation.png', 8, [200, 200, 200, 200, 200, 200, 200, 10000]);
+        var block_renderer = new block_renderer_1["default"]();
+        var block_animator = new block_animator_1["default"]();
+        var block = new block_1["default"](block_1.BlockTypes.I, { x: 1, y: 1 });
+        var block2 = new block_1["default"](block_1.BlockTypes.J, { x: 2, y: 1 });
+        var block3 = new block_1["default"](block_1.BlockTypes.S, { x: 3, y: 1 });
+        var block4 = new block_1["default"](block_1.BlockTypes.Z, { x: 4, y: 1 });
+        var block5 = new block_1["default"](block_1.BlockTypes.L, { x: 5, y: 1 });
+        var block6 = new block_1["default"](block_1.BlockTypes.O, { x: 6, y: 1 });
+        var block7 = new block_1["default"](block_1.BlockTypes.T, { x: 7, y: 1 });
+        block_animator.popBlock(block2);
+        block_animator.popBlock(block3);
+        block_animator.popBlock(block4);
+        block_animator.popBlock(block5);
+        block_animator.popBlock(block6);
+        block_animator.popBlock(block7);
         //input.register_hold('ArrowUp', () => player.thrust(elapsedTime));
         //input.register_hold('ArrowLeft', () => player.turnLeft(elapsedTime));
         //input.register_hold('ArrowRight', () => player.turnRight(elapsedTime));
@@ -624,19 +784,13 @@ define("game", ["require", "exports", "utils/input", "utils/scores", "utils/time
         function update(elapsedTime) {
             // Update Objects
             particles_1["default"].update(elapsedTime);
+            block_animator.update(elapsedTime);
             timer.updateTime(elapsedTime);
-            animation.update(elapsedTime);
         }
         function render() {
             Graphics.clear();
-            sprite.render({ center: { x: 10, y: 10 }, size: { width: 10, height: 10 } }, 0);
-            sprite.render({ center: { x: 20, y: 20 }, size: { width: 10, height: 10 } }, 1);
-            sprite.render({ center: { x: 30, y: 30 }, size: { width: 10, height: 10 } }, 2);
-            sprite.render({ center: { x: 40, y: 40 }, size: { width: 10, height: 10 } }, 3);
-            sprite.render({ center: { x: 50, y: 50 }, size: { width: 10, height: 10 } }, 4);
-            sprite.render({ center: { x: 60, y: 60 }, size: { width: 10, height: 10 } }, 5);
-            sprite.render({ center: { x: 500, y: 500 }, size: { width: 100, height: 100 } }, 6);
-            animation.render({ center: { x: 80, y: 80 }, size: { width: 20, height: 20 } });
+            block_animator.render();
+            block_renderer.render(block);
             particles_1["default"].render();
         }
         function gameLoop(currTime) {

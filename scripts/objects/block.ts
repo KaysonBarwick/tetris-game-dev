@@ -1,5 +1,7 @@
 /// <reference path="../graphics/graphics.ts" />
-import settings from '../settings';
+import Settings from '../settings';
+
+import Object from './object'
 
 export enum BlockTypes {
     L,
@@ -11,8 +13,18 @@ export enum BlockTypes {
     Z
 }
 
-export default class Block {
-    constructor(private type: BlockTypes, private index: {x: number, y: number}){}
+export default class Block extends Object {
+    constructor(private type: BlockTypes, private index: {x: number, y: number}){
+        super();
+    }
+
+    public getCenter() {
+        return {x: this.getIndex().x * Settings.block_size, y: this.getIndex().y * Settings.block_size};
+    }
+
+    public getSize() {
+        return {height: Settings.block_size, width: Settings.block_size};
+    }
 
     public fall(): boolean {
         this.index.y--;
@@ -33,7 +45,7 @@ export default class Block {
         return this.type;
     }
 
-    public Index(): {x: number, y: number} {
+    public getIndex(): {x: number, y: number} {
         return this.index;
     }
 }
