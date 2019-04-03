@@ -1,13 +1,17 @@
 namespace Random {
-    export function random(min: number, max: number): number {
+    export function randomDouble(min: number, max: number): number {
         return Math.random() * (max - min) + min;
+    }
+
+    export function randomInt(min:number, max: number): number {
+        return Math.floor(randomDouble(min, max));
     }
 
     export function randomCircleVector(min_angle: number, max_angle: number): {x: number, y: number} {
         if(min_angle > max_angle){
             [min_angle, max_angle] = [max_angle, min_angle];
         }
-        let angle = random(min_angle, max_angle);
+        let angle = randomDouble(min_angle, max_angle);
         return {
             x: Math.sin(angle),
             y: -Math.cos(angle)

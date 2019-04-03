@@ -29,7 +29,7 @@ namespace Graphics {
         a: number;
     }
 
-    export function drawRectangle(dim: Dimensions, color: Color){
+    export function drawRectangle(dim: Dimensions, color: Color = {r: 0, g: 0, b: 0, a: 1}){
         context.save();
 
         context.fillStyle = 'rgb(' + color.r + ',' + color.g + ',' + color.b + ',' + color.a + ')'

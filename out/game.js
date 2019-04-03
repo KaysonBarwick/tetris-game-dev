@@ -35,6 +35,7 @@ var Graphics;
     }
     Graphics.clear = clear;
     function drawRectangle(dim, color) {
+        if (color === void 0) { color = { r: 0, g: 0, b: 0, a: 1 }; }
         context.save();
         context.fillStyle = 'rgb(' + color.r + ',' + color.g + ',' + color.b + ',' + color.a + ')';
         context.strokeStyle = 'rgba(0, 0, 0, 1)';
@@ -196,9 +197,15 @@ define("settings", ["require", "exports"], function (require, exports) {
     exports.__esModule = true;
     var settings = {
         board: { height: 20, width: 10 },
-        board_offset: 82,
-        block_size: 100
+        board_offset: { x: 82, y: 20 },
+        board_width: 500,
+        next_block_count: 4,
+        block_respawn_delay: 500,
+        fall_rate: 250,
+        fall_rate_per_level: 50,
+        block_size: null
     };
+    settings.block_size = settings.board_width / settings.board.width;
     exports["default"] = settings;
 });
 define("utils/input", ["require", "exports"], function (require, exports) {
@@ -350,16 +357,20 @@ define("utils/timer", ["require", "exports"], function (require, exports) {
 });
 var Random;
 (function (Random) {
-    function random(min, max) {
+    function randomDouble(min, max) {
         return Math.random() * (max - min) + min;
     }
-    Random.random = random;
+    Random.randomDouble = randomDouble;
+    function randomInt(min, max) {
+        return Math.floor(randomDouble(min, max));
+    }
+    Random.randomInt = randomInt;
     function randomCircleVector(min_angle, max_angle) {
         var _a;
         if (min_angle > max_angle) {
             _a = [max_angle, min_angle], min_angle = _a[0], max_angle = _a[1];
         }
-        var angle = random(min_angle, max_angle);
+        var angle = randomDouble(min_angle, max_angle);
         return {
             x: Math.sin(angle),
             y: -Math.cos(angle)
@@ -551,6 +562,395 @@ define("objects/object", ["require", "exports"], function (require, exports) {
     }());
     exports["default"] = Object;
 });
+define("objects/block", ["require", "exports", "settings", "objects/object"], function (require, exports, settings_1, object_1) {
+    "use strict";
+    exports.__esModule = true;
+    var BlockTypes;
+    (function (BlockTypes) {
+        BlockTypes[BlockTypes["L"] = 0] = "L";
+        BlockTypes[BlockTypes["I"] = 1] = "I";
+        BlockTypes[BlockTypes["O"] = 2] = "O";
+        BlockTypes[BlockTypes["T"] = 3] = "T";
+        BlockTypes[BlockTypes["S"] = 4] = "S";
+        BlockTypes[BlockTypes["J"] = 5] = "J";
+        BlockTypes[BlockTypes["Z"] = 6] = "Z";
+    })(BlockTypes = exports.BlockTypes || (exports.BlockTypes = {}));
+    var Block = /** @class */ (function (_super) {
+        __extends(Block, _super);
+        function Block(type, index) {
+            var _this = _super.call(this) || this;
+            _this.type = type;
+            _this.index = index;
+            _this.active = true;
+            return _this;
+        }
+        Block.prototype.getCenter = function () {
+            var x = this.getIndex().x * settings_1["default"].block_size + settings_1["default"].board_offset.x;
+            var y = (this.getIndex().y - 2) * settings_1["default"].block_size + settings_1["default"].board_offset.y;
+            return { x: x, y: y };
+        };
+        Block.prototype.getSize = function () {
+            return { height: settings_1["default"].block_size, width: settings_1["default"].block_size };
+        };
+        Block.prototype.fall = function () {
+            this.index.y++;
+        };
+        Block.prototype.moveRight = function () {
+            this.index.x++;
+        };
+        Block.prototype.moveLeft = function () {
+            this.index.x--;
+        };
+        Block.prototype.rotateRight = function (topLeft) {
+            var x = this.index.x - topLeft.x;
+            var y = this.index.y - topLeft.y;
+            if (this.type == BlockTypes.J || this.type == BlockTypes.L || this.type == BlockTypes.S || this.type == BlockTypes.Z || this.type == BlockTypes.T) {
+                if (y == 0) { // Top row goes to right
+                    y = x;
+                    x = 2;
+                }
+                else if (y == 1) { // Middle to middle
+                    y = x;
+                    x = 1;
+                }
+                else if (y == 2) { // bottom to left
+                    y = x;
+                    x = 0;
+                }
+            }
+            else if (this.type == BlockTypes.I) {
+                if (y == 0) { // Top row goes to right
+                    y = x;
+                    x = 3;
+                }
+                else if (y == 1) { // Middle top to middle right
+                    y = x;
+                    x = 2;
+                }
+                else if (y == 2) { // Middle bottom to middle left
+                    y = x;
+                    x = 1;
+                }
+                else if (y == 3) { // bottom to left
+                    y = x;
+                    x = 0;
+                }
+            }
+            this.index.x = x + topLeft.x;
+            this.index.y = y + topLeft.y;
+        };
+        Block.prototype.rotateLeft = function (topLeft) {
+            var x = this.index.x - topLeft.x;
+            var y = this.index.y - topLeft.y;
+            if (this.type == BlockTypes.J || this.type == BlockTypes.L || this.type == BlockTypes.S || this.type == BlockTypes.Z || this.type == BlockTypes.T) {
+                if (x == 0) { // Top row goes to left
+                    x = y;
+                    y = 2;
+                }
+                else if (x == 1) { // Middle to middle
+                    x = y;
+                    y = 1;
+                }
+                else if (x == 2) { // bottom to right
+                    x = y;
+                    y = 0;
+                }
+            }
+            else if (this.type == BlockTypes.I) {
+                if (x == 0) { // Top row goes to right
+                    x = y;
+                    y = 3;
+                }
+                else if (x == 1) { // Middle top to middle right
+                    x = y;
+                    y = 2;
+                }
+                else if (x == 2) { // Middle bottom to middle left
+                    x = y;
+                    y = 1;
+                }
+                else if (x == 3) { // bottom to left
+                    x = y;
+                    y = 0;
+                }
+            }
+            this.index.x = x + topLeft.x;
+            this.index.y = y + topLeft.y;
+        };
+        Block.prototype.getType = function () {
+            return this.type;
+        };
+        Block.prototype.getIndex = function () {
+            return this.index;
+        };
+        Block.prototype.setIndex = function (x, y) {
+            this.index.x = x;
+            this.index.y = y;
+        };
+        Block.prototype.isActive = function () {
+            return this.active;
+        };
+        Block.prototype.toggleActive = function (value) {
+            if (value === void 0) { value = !this.active; }
+            this.active = value;
+        };
+        return Block;
+    }(object_1["default"]));
+    exports["default"] = Block;
+});
+/// <reference path="../utils/random.ts" />
+define("objects/board", ["require", "exports", "objects/block", "settings"], function (require, exports, block_1, settings_2) {
+    "use strict";
+    exports.__esModule = true;
+    var Board = /** @class */ (function () {
+        function Board(level) {
+            if (level === void 0) { level = 1; }
+            this.level = level;
+            this.board = [];
+            this.nextBlocks = [];
+            this.activeBlocks = [];
+            this.activeRotate = 0; // 0 = rotate 0, 1 = rotate 90, 2 = rotate 180, 3 = rotate -90
+            this.fallCarryOver = 0;
+            this.blockDelayCarryOver = 0;
+            // board[0] and board[1] will be off screen and used to detect loss and
+            // make the blocks appear to fall onto the screen.
+            for (var i = 0; i <= settings_2["default"].board.height + 1; i++) {
+                var row = [];
+                for (var j = 0; j < settings_2["default"].board.width; j++) {
+                    row.push(null);
+                }
+                this.board.push(row);
+            }
+            for (var i = 0; i < settings_2["default"].next_block_count; ++i) {
+                this.nextBlocks.push(Random.randomInt(0, 6));
+            }
+        }
+        //
+        // ------------Getters------------
+        Board.prototype.isActive = function () {
+            return this.activeBlocks.length > 0;
+        };
+        Board.prototype.getBoard = function () {
+            return this.board;
+        };
+        Board.prototype.getActiveBlocks = function () {
+            return this.activeBlocks;
+        };
+        Board.prototype.getNextBlocks = function () {
+            return this.nextBlocks;
+        };
+        //
+        // ------------Game actions------------
+        Board.prototype.update = function (elapsed_time) {
+            if (this.isActive()) {
+                this.fallCarryOver += elapsed_time;
+                var fall_rate = settings_2["default"].fall_rate - settings_2["default"].fall_rate_per_level * this.level;
+                if (this.fallCarryOver >= fall_rate) {
+                    this.fallCarryOver -= fall_rate;
+                    this.fall();
+                }
+            }
+            else {
+                this.blockDelayCarryOver += elapsed_time;
+                if (this.blockDelayCarryOver >= settings_2["default"].block_respawn_delay) {
+                    this.blockDelayCarryOver -= settings_2["default"].block_respawn_delay;
+                    this.addBlock();
+                }
+            }
+        };
+        Board.prototype.nextBlock = function () {
+            var next = this.nextBlocks.shift();
+            this.nextBlocks.push(Random.randomInt(0, 6));
+            return next;
+        };
+        Board.prototype.addBlock = function () {
+            var type = this.nextBlock();
+            var middle = Math.floor(settings_2["default"].board.width / 2);
+            this.activeRotate = 0;
+            this.topLeft = { x: middle - 1, y: 0 };
+            switch (type) {
+                case block_1.BlockTypes.L:
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.L, { x: middle - 1, y: 0 }));
+                    for (var i = middle - 1; i <= middle + 1; ++i) {
+                        this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.L, { x: i, y: 1 }));
+                    }
+                    break;
+                case block_1.BlockTypes.I:
+                    for (var i = middle - 1; i <= middle + 2; ++i) {
+                        this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.I, { x: i, y: 1 }));
+                    }
+                    break;
+                case block_1.BlockTypes.O:
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.O, { x: middle, y: 0 }));
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.O, { x: middle + 1, y: 0 }));
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.O, { x: middle, y: 1 }));
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.O, { x: middle + 1, y: 1 }));
+                    break;
+                case block_1.BlockTypes.T:
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.T, { x: middle, y: 0 }));
+                    for (var i = middle - 1; i <= middle + 1; ++i) {
+                        this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.T, { x: i, y: 1 }));
+                    }
+                    break;
+                case block_1.BlockTypes.S:
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.S, { x: middle, y: 0 }));
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.S, { x: middle + 1, y: 0 }));
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.S, { x: middle, y: 1 }));
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.S, { x: middle - 1, y: 1 }));
+                    break;
+                case block_1.BlockTypes.J:
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.J, { x: middle + 1, y: 0 }));
+                    for (var i = middle - 1; i <= middle + 1; ++i) {
+                        this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.J, { x: i, y: 1 }));
+                    }
+                    break;
+                case block_1.BlockTypes.Z:
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.Z, { x: middle, y: 0 }));
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.Z, { x: middle - 1, y: 0 }));
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.Z, { x: middle, y: 1 }));
+                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.Z, { x: middle + 1, y: 1 }));
+                    break;
+            }
+        };
+        Board.prototype.fall = function () {
+            var _this = this;
+            var active = true;
+            // Check for blocks below active blocks
+            this.activeBlocks.forEach(function (block) {
+                var x = block.getIndex().x;
+                var y = block.getIndex().y;
+                if (y > settings_2["default"].board.height || _this.board[y + 1][x] != null) {
+                    active = false; // Hit bottom or block beneath
+                }
+            });
+            if (active) {
+                // Make blocks fall
+                this.activeBlocks.forEach(function (block) {
+                    block.fall();
+                });
+                this.topLeft.y++;
+            }
+            else {
+                // Deactivate blocks by moving them to board
+                this.activeBlocks.forEach(function (block) {
+                    _this.board[block.getIndex().y][block.getIndex().x] = block;
+                });
+                this.activeBlocks = [];
+            }
+        };
+        //
+        // ------------Player Actions------------
+        Board.prototype.moveLeft = function () {
+            var _this = this;
+            var canMove = true;
+            this.activeBlocks.forEach(function (block) {
+                var x = block.getIndex().x;
+                var y = block.getIndex().y;
+                if (x < 1 || _this.board[y][x - 1] != null) {
+                    canMove = false;
+                }
+            });
+            if (canMove) {
+                this.activeBlocks.forEach(function (block) {
+                    block.moveLeft();
+                });
+                this.topLeft.x--;
+            }
+        };
+        Board.prototype.moveRight = function () {
+            var _this = this;
+            var canMove = true;
+            this.activeBlocks.forEach(function (block) {
+                var x = block.getIndex().x;
+                var y = block.getIndex().y;
+                if (x >= settings_2["default"].board.width - 1 || _this.board[y][x + 1] != null) {
+                    canMove = false;
+                }
+            });
+            if (canMove) {
+                this.activeBlocks.forEach(function (block) {
+                    block.moveRight();
+                });
+                this.topLeft.x++;
+            }
+        };
+        Board.prototype.rotateRight = function () {
+            //let type = this.activeBlocks[0].getType();
+            var _this = this;
+            //let next_active: Block[] = this.activeBlocks.slice();
+            // let next_rotate: number = this.activeRotate + 1 % 4;
+            // let success: boolean = false;
+            // if(type == BlockTypes.I){
+            // }
+            // else if(type == BlockTypes.J || type == BlockTypes.L || type == BlockTypes.S || type == BlockTypes.Z || type == BlockTypes.T){
+            // }
+            // else if(type == BlockTypes.O){
+            //     success = true;
+            // }
+            // if(success){
+            //     this.activeBlocks = next_active;
+            //     this.activeRotate = next_rotate;
+            // }
+            this.activeBlocks.forEach(function (block) {
+                block.rotateRight(_this.topLeft);
+            });
+        };
+        Board.prototype.rotateLeft = function () {
+            var _this = this;
+            this.activeBlocks.forEach(function (block) {
+                block.rotateLeft(_this.topLeft);
+            });
+        };
+        Board.prototype.fastDrop = function (elapsed_time) {
+        };
+        Board.prototype.hardDrop = function () {
+        };
+        return Board;
+    }());
+    exports["default"] = Board;
+});
+define("graphics/sprite-sheet", ["require", "exports"], function (require, exports) {
+    "use strict";
+    exports.__esModule = true;
+    var SpriteSheet = /** @class */ (function () {
+        function SpriteSheet(src, spriteCount) {
+            var _this = this;
+            this.spriteCount = spriteCount;
+            this.image = new Graphics.Texture({
+                src: src,
+                center: { x: 0, y: 0 },
+                subTextureIndex: 0,
+                onload: function () { _this.image.spec.subTextureWidth = _this.image.getWidth() / _this.spriteCount; }
+            });
+        }
+        SpriteSheet.prototype.render = function (model, index) {
+            this.image.spec.center = __assign({}, model.center);
+            this.image.spec.rotation = model.rotation;
+            this.image.spec.size = __assign({}, model.size);
+            this.image.spec.subTextureIndex = index;
+            this.image.draw();
+        };
+        return SpriteSheet;
+    }());
+    exports["default"] = SpriteSheet;
+});
+define("render/block_renderer", ["require", "exports", "graphics/sprite-sheet"], function (require, exports, sprite_sheet_1) {
+    "use strict";
+    exports.__esModule = true;
+    var BlockRenderer = /** @class */ (function () {
+        function BlockRenderer() {
+            this.sprites = new sprite_sheet_1["default"]('./assets/blocks.png', 7);
+        }
+        BlockRenderer.prototype.render = function (block) {
+            this.sprites.render({
+                center: block.getCenter(),
+                size: block.getSize()
+            }, block.getType());
+        };
+        return BlockRenderer;
+    }());
+    exports["default"] = BlockRenderer;
+});
 define("graphics/animated-model", ["require", "exports"], function (require, exports) {
     "use strict";
     exports.__esModule = true;
@@ -597,97 +997,6 @@ define("graphics/animated-model", ["require", "exports"], function (require, exp
     }());
     exports["default"] = AnimatedModel;
 });
-define("objects/block", ["require", "exports", "settings", "objects/object"], function (require, exports, settings_1, object_1) {
-    "use strict";
-    exports.__esModule = true;
-    var BlockTypes;
-    (function (BlockTypes) {
-        BlockTypes[BlockTypes["L"] = 0] = "L";
-        BlockTypes[BlockTypes["I"] = 1] = "I";
-        BlockTypes[BlockTypes["O"] = 2] = "O";
-        BlockTypes[BlockTypes["T"] = 3] = "T";
-        BlockTypes[BlockTypes["S"] = 4] = "S";
-        BlockTypes[BlockTypes["J"] = 5] = "J";
-        BlockTypes[BlockTypes["Z"] = 6] = "Z";
-    })(BlockTypes = exports.BlockTypes || (exports.BlockTypes = {}));
-    var Block = /** @class */ (function (_super) {
-        __extends(Block, _super);
-        function Block(type, index) {
-            var _this = _super.call(this) || this;
-            _this.type = type;
-            _this.index = index;
-            return _this;
-        }
-        Block.prototype.getCenter = function () {
-            return { x: this.getIndex().x * settings_1["default"].block_size, y: this.getIndex().y * settings_1["default"].block_size };
-        };
-        Block.prototype.getSize = function () {
-            return { height: settings_1["default"].block_size, width: settings_1["default"].block_size };
-        };
-        Block.prototype.fall = function () {
-            this.index.y--;
-            return true;
-        };
-        Block.prototype.moveRight = function () {
-            this.index.x++;
-            return true;
-        };
-        Block.prototype.moveLeft = function () {
-            this.index.x--;
-            return true;
-        };
-        Block.prototype.getType = function () {
-            return this.type;
-        };
-        Block.prototype.getIndex = function () {
-            return this.index;
-        };
-        return Block;
-    }(object_1["default"]));
-    exports["default"] = Block;
-});
-define("graphics/sprite-sheet", ["require", "exports"], function (require, exports) {
-    "use strict";
-    exports.__esModule = true;
-    var SpriteSheet = /** @class */ (function () {
-        function SpriteSheet(src, spriteCount) {
-            var _this = this;
-            this.spriteCount = spriteCount;
-            this.image = new Graphics.Texture({
-                src: src,
-                center: { x: 0, y: 0 },
-                subTextureIndex: 0,
-                onload: function () { _this.image.spec.subTextureWidth = _this.image.getWidth() / _this.spriteCount; }
-            });
-        }
-        SpriteSheet.prototype.render = function (model, index) {
-            this.image.spec.center = __assign({}, model.center);
-            this.image.spec.rotation = model.rotation;
-            this.image.spec.size = __assign({}, model.size);
-            this.image.spec.subTextureIndex = index;
-            this.image.draw();
-        };
-        return SpriteSheet;
-    }());
-    exports["default"] = SpriteSheet;
-});
-define("render/block_renderer", ["require", "exports", "graphics/sprite-sheet"], function (require, exports, sprite_sheet_1) {
-    "use strict";
-    exports.__esModule = true;
-    var BlockRenderer = /** @class */ (function () {
-        function BlockRenderer() {
-            this.sprites = new sprite_sheet_1["default"]('./assets/blocks.png', 7);
-        }
-        BlockRenderer.prototype.render = function (block) {
-            this.sprites.render({
-                center: block.getCenter(),
-                size: block.getSize()
-            }, block.getType());
-        };
-        return BlockRenderer;
-    }());
-    exports["default"] = BlockRenderer;
-});
 define("render/block_animator", ["require", "exports", "graphics/animated-model"], function (require, exports, animated_model_1) {
     "use strict";
     exports.__esModule = true;
@@ -715,6 +1024,7 @@ define("render/block_animator", ["require", "exports", "graphics/animated-model"
                 animator.update(elapsed_time);
                 if (animator.isDone()) {
                     _this.popBlocks.splice(index, 1);
+                    // Add pop particals here
                 }
             });
         };
@@ -727,9 +1037,36 @@ define("render/block_animator", ["require", "exports", "graphics/animated-model"
     }());
     exports["default"] = BlockRenderer;
 });
+/// <reference path="../graphics/graphics.ts" />
+define("render/board_renderer", ["require", "exports", "render/block_renderer"], function (require, exports, block_renderer_1) {
+    "use strict";
+    exports.__esModule = true;
+    var BoardRenderer = /** @class */ (function () {
+        function BoardRenderer() {
+            this.block_renderer = new block_renderer_1["default"]();
+        }
+        BoardRenderer.prototype.render = function (board) {
+            var _this = this;
+            board.getBoard().forEach(function (row) {
+                row.forEach(function (block) {
+                    if (block && block.getIndex().y > 1) {
+                        _this.block_renderer.render(block);
+                    }
+                });
+            });
+            board.getActiveBlocks().forEach(function (block) {
+                if (block && block.getIndex().y > 1) {
+                    _this.block_renderer.render(block);
+                }
+            });
+        };
+        return BoardRenderer;
+    }());
+    exports["default"] = BoardRenderer;
+});
 /// <reference path="./graphics/graphics.ts" />
 /// <reference path="./utils/screens.ts" />
-define("game", ["require", "exports", "utils/input", "utils/scores", "utils/timer", "graphics/particles", "objects/block", "render/block_renderer", "render/block_animator"], function (require, exports, input_1, scores_1, timer_1, particles_1, block_1, block_renderer_1, block_animator_1) {
+define("game", ["require", "exports", "utils/input", "utils/scores", "utils/timer", "graphics/particles", "objects/block", "objects/board", "render/block_renderer", "render/block_animator", "render/board_renderer"], function (require, exports, input_1, scores_1, timer_1, particles_1, block_2, board_1, block_renderer_2, block_animator_1, board_renderer_1) {
     "use strict";
     exports.__esModule = true;
     var Game;
@@ -739,24 +1076,33 @@ define("game", ["require", "exports", "utils/input", "utils/scores", "utils/time
         var elapsedTime = 0;
         var input = new input_1["default"]();
         var timer = new timer_1["default"]('div-timer');
-        var block_renderer = new block_renderer_1["default"]();
+        var block_renderer = new block_renderer_2["default"]();
         var block_animator = new block_animator_1["default"]();
-        var block = new block_1["default"](block_1.BlockTypes.I, { x: 1, y: 1 });
-        var block2 = new block_1["default"](block_1.BlockTypes.J, { x: 2, y: 1 });
-        var block3 = new block_1["default"](block_1.BlockTypes.S, { x: 3, y: 1 });
-        var block4 = new block_1["default"](block_1.BlockTypes.Z, { x: 4, y: 1 });
-        var block5 = new block_1["default"](block_1.BlockTypes.L, { x: 5, y: 1 });
-        var block6 = new block_1["default"](block_1.BlockTypes.O, { x: 6, y: 1 });
-        var block7 = new block_1["default"](block_1.BlockTypes.T, { x: 7, y: 1 });
+        var board_renderer = new board_renderer_1["default"]();
+        var board = new board_1["default"]();
+        var block = new block_2["default"](block_2.BlockTypes.I, { x: 1, y: 1 });
+        var block2 = new block_2["default"](block_2.BlockTypes.J, { x: 2, y: 1 });
+        var block3 = new block_2["default"](block_2.BlockTypes.S, { x: 3, y: 1 });
+        var block4 = new block_2["default"](block_2.BlockTypes.Z, { x: 4, y: 1 });
+        var block5 = new block_2["default"](block_2.BlockTypes.L, { x: 5, y: 1 });
+        var block6 = new block_2["default"](block_2.BlockTypes.O, { x: 6, y: 1 });
+        var block7 = new block_2["default"](block_2.BlockTypes.T, { x: 7, y: 1 });
         block_animator.popBlock(block2);
         block_animator.popBlock(block3);
         block_animator.popBlock(block4);
         block_animator.popBlock(block5);
         block_animator.popBlock(block6);
         block_animator.popBlock(block7);
-        //input.register_hold('ArrowUp', () => player.thrust(elapsedTime));
-        //input.register_hold('ArrowLeft', () => player.turnLeft(elapsedTime));
-        //input.register_hold('ArrowRight', () => player.turnRight(elapsedTime));
+        input.register_press('ArrowUp', function () { return board.hardDrop(); });
+        input.register_press('ArrowDown', function () { return board.fastDrop(elapsedTime); });
+        input.register_press('ArrowLeft', function () { return board.moveLeft(); });
+        input.register_press('ArrowRight', function () { return board.moveRight(); });
+        input.register_press('w', function () { return board.hardDrop(); });
+        input.register_press('s', function () { return board.fastDrop(elapsedTime); });
+        input.register_press('a', function () { return board.moveLeft(); });
+        input.register_press('d', function () { return board.moveRight(); });
+        input.register_press('q', function () { return board.rotateLeft(); });
+        input.register_press('e', function () { return board.rotateRight(); });
         input.register_press('Escape', function () { return pause(); });
         function init() {
             scores_1["default"].resetScore();
@@ -764,14 +1110,12 @@ define("game", ["require", "exports", "utils/input", "utils/scores", "utils/time
         }
         function run() {
             // (<HTMLAudioElement>document.getElementById('myMusic')).play();
-            // (<HTMLVideoElement>document.getElementById('myVideo')).play();
             nextFrame = true;
             prevTime = performance.now();
             requestAnimationFrame(gameLoop);
         }
         function pause() {
             nextFrame = false;
-            document.getElementById('myVideo').pause();
             Screens.showSubScreen('sub-screen-pause');
         }
         function quit() {
@@ -783,6 +1127,7 @@ define("game", ["require", "exports", "utils/input", "utils/scores", "utils/time
         }
         function update(elapsedTime) {
             // Update Objects
+            board.update(elapsedTime);
             particles_1["default"].update(elapsedTime);
             block_animator.update(elapsedTime);
             timer.updateTime(elapsedTime);
@@ -791,6 +1136,7 @@ define("game", ["require", "exports", "utils/input", "utils/scores", "utils/time
             Graphics.clear();
             block_animator.render();
             block_renderer.render(block);
+            board_renderer.render(board);
             particles_1["default"].render();
         }
         function gameLoop(currTime) {

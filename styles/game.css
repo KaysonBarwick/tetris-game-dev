@@ -2,7 +2,7 @@ html {
     margin: 0px;
     height: 100%;
     width: 100%;
-    background-color: #1a0053;
+    background-color: #000000;
  }
 
 body {
@@ -34,8 +34,8 @@ body {
 }
 
 #game .screen {
-    width: 1000px;
-    height: 1000px;
+    width: 100%;
+    height: 100%;
     display: none;
     position: absolute;
 }

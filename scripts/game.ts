@@ -6,11 +6,13 @@ import Input from './utils/input';
 import Score from './utils/scores';
 import Timer from './utils/timer';
 import Particles from './graphics/particles';
-import Animation from './graphics/animated-model';
 
 import Block, { BlockTypes } from './objects/block';
+import Board from './objects/board';
+
 import BlockRenderer from './render/block_renderer';
 import BlockAnimator from './render/block_animator';
+import BoardRenderer from './render/board_renderer';
 
 namespace Game {
 
@@ -23,6 +25,9 @@ namespace Game {
 
     let block_renderer = new BlockRenderer();
     let block_animator = new BlockAnimator();
+    let board_renderer = new BoardRenderer();
+
+    let board = new Board();
 
     let block = new Block(BlockTypes.I, {x: 1, y: 1});
     let block2 = new Block(BlockTypes.J, {x: 2, y: 1});
@@ -38,10 +43,20 @@ namespace Game {
     block_animator.popBlock(block6);
     block_animator.popBlock(block7);
 
-    //input.register_hold('ArrowUp', () => player.thrust(elapsedTime));
-    //input.register_hold('ArrowLeft', () => player.turnLeft(elapsedTime));
-    //input.register_hold('ArrowRight', () => player.turnRight(elapsedTime));
+    input.register_press('ArrowUp', () => board.hardDrop());
+    input.register_press('ArrowDown', () => board.fastDrop(elapsedTime));
+    input.register_press('ArrowLeft', () => board.moveLeft());
+    input.register_press('ArrowRight', () => board.moveRight());
+
+    input.register_press('w', () => board.hardDrop());
+    input.register_press('s', () => board.fastDrop(elapsedTime));
+    input.register_press('a', () => board.moveLeft());
+    input.register_press('d', () => board.moveRight());
+    input.register_press('q', () => board.rotateLeft());
+    input.register_press('e', () => board.rotateRight());
+
     input.register_press('Escape', () => pause());
+
 
     function init(){
         Score.resetScore();
@@ -50,7 +65,6 @@ namespace Game {
 
     function run(){
         // (<HTMLAudioElement>document.getElementById('myMusic')).play();
-        // (<HTMLVideoElement>document.getElementById('myVideo')).play();
 
         nextFrame = true;
         prevTime = performance.now();
@@ -59,7 +73,6 @@ namespace Game {
 
     function pause(){
         nextFrame = false;
-        (<HTMLVideoElement>document.getElementById('myVideo')).pause();
         Screens.showSubScreen('sub-screen-pause');
     }
 
@@ -74,6 +87,7 @@ namespace Game {
 
     function update(elapsedTime: DOMHighResTimeStamp){
         // Update Objects
+        board.update(elapsedTime);
         Particles.update(elapsedTime);
         block_animator.update(elapsedTime);
         timer.updateTime(elapsedTime);
@@ -83,6 +97,7 @@ namespace Game {
         Graphics.clear();
         block_animator.render();
         block_renderer.render(block);
+        board_renderer.render(board);
         Particles.render();
     }
 
