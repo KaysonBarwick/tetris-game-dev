@@ -19,5 +19,14 @@ export default class BoardRenderer {
                 this.block_renderer.render(block);
             }
         });
+
+        let shadowBlocks = board.getShadowBlocks();
+        // Check for blocks below active blocks
+        shadowBlocks.forEach(block => {
+            if(block && block.getIndex().y > 1){
+                this.block_renderer.render(block, true);
+            }
+        });
+
     }
 }

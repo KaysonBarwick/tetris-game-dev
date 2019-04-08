@@ -26,4 +26,8 @@ export default class SpriteSheet {
         this.image.spec.subTextureIndex = index;
         this.image.draw();
     }
+
+    public setTransparency(a: number): void {
+        this.image.setTransparency(a);
+    }
 }

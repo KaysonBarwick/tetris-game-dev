@@ -60,6 +60,7 @@ namespace Graphics {
         subTextureWidth?: number;
         subTextureIndex?: number;
         onload?(): any;
+        transparency?: number;
     }
 
     export function drawTexture(image, index, subTextureWidth, center, rotation, size) {
@@ -98,6 +99,10 @@ namespace Graphics {
             return this.image.height;
         }
 
+        setTransparency(a: number){
+            this.spec.transparency = a;
+        }
+
         draw(){
             if(this.ready){
                 context.save();
@@ -118,11 +123,15 @@ namespace Graphics {
                     this.spec.subTextureIndex = 0;
                     this.spec.subTextureWidth = this.spec.size.width;
                 }
+                if(this.spec.transparency == null){
+                    this.spec.transparency = 1;
+                }
 
                 context.translate(x, y);
                 context.rotate(this.spec.rotation);
                 context.translate(-x, -y);
                 
+                context.globalAlpha = this.spec.transparency;
                 context.drawImage(this.image,
                     this.spec.subTextureWidth * this.spec.subTextureIndex, 0,
                     this.spec.subTextureWidth, this.getHeight(),

@@ -49,6 +49,37 @@ export default class Board {
         return this.nextBlocks;
     }
 
+    public getShadowBlocks(): Block[] {
+        let shadowBlocks: Block[] = []
+        this.activeBlocks.forEach(block => {
+            shadowBlocks.push(block.duplicate());
+        });
+
+        if(shadowBlocks.length == 0){
+            return [];
+        }
+
+        let active: boolean = true;
+
+        // Check for blocks below active blocks
+        while(active){
+            shadowBlocks.forEach(block => {
+                let x = block.getIndex().x;
+                let y = block.getIndex().y;
+                if(y > Settings.board.height || this.board[y + 1][x] != null){
+                    active = false; // Hit bottom or block beneath
+                }
+            });
+            if(active){
+                shadowBlocks.forEach(block => {
+                    block.fall();
+                });
+            }
+        }
+
+        return shadowBlocks;
+    }
+
     //
     // ------------Game actions------------
     public update(elapsed_time: DOMHighResTimeStamp){
@@ -61,10 +92,29 @@ export default class Board {
             }
         }
         else{
+            this.popRow();
             this.blockDelayCarryOver += elapsed_time;
             if(this.blockDelayCarryOver >= Settings.block_respawn_delay){
                 this.blockDelayCarryOver -= Settings.block_respawn_delay;
                 this.addBlock();
+            }
+        }
+    }
+
+    private popRow(){
+        for(let i = 0; i < this.board.length; ++i){
+            let shouldPop = true;
+            for(let j = 0; j < this.board[i].length; j++){
+                if(this.board[i][j] == null){
+                    shouldPop = false;
+                    break;
+                }
+            }
+            if(shouldPop){
+                for(let j = 0; j < this.board[i].length; j++){
+                    
+                    this.board[i][j] = null;
+                }
             }
         }
     }
@@ -127,7 +177,10 @@ export default class Board {
         }
     }
 
-    private fall(){
+    public fall(){
+        if(!this.isActive()){
+            return;
+        }
         let active: boolean = true;
         // Check for blocks below active blocks
         this.activeBlocks.forEach(block => {
@@ -157,6 +210,9 @@ export default class Board {
     //
     // ------------Player Actions------------
     public moveLeft(){
+        if(!this.isActive()){
+            return;
+        }
         let canMove: boolean = true;
         this.activeBlocks.forEach(block => {
             let x = block.getIndex().x;
@@ -174,6 +230,9 @@ export default class Board {
     }
 
     public moveRight(){
+        if(!this.isActive()){
+            return;
+        }
         let canMove: boolean = true;
         this.activeBlocks.forEach(block => {
             let x = block.getIndex().x;
@@ -191,34 +250,160 @@ export default class Board {
     }
 
     public rotateRight(){
-        //let type = this.activeBlocks[0].getType();
+        if(!this.isActive()){
+            return;
+        }
+        let type = this.activeBlocks[0].getType();
+        this.activeRotate = (((this.activeRotate + 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
+        
 
-        //let next_active: Block[] = this.activeBlocks.slice();
-        // let next_rotate: number = this.activeRotate + 1 % 4;
-
-        // let success: boolean = false;
-        // if(type == BlockTypes.I){
-        // }
-        // else if(type == BlockTypes.J || type == BlockTypes.L || type == BlockTypes.S || type == BlockTypes.Z || type == BlockTypes.T){
-
-        // }
-        // else if(type == BlockTypes.O){
-        //     success = true;
-        // }
-
-        // if(success){
-        //     this.activeBlocks = next_active;
-        //     this.activeRotate = next_rotate;
-        // }
         this.activeBlocks.forEach(block =>{
             block.rotateRight(this.topLeft);
         });
+
+        let wallKick: {x: number, y: number}[] = [];
+        let success: boolean = false;
+        if(type == BlockTypes.I){
+            if(this.activeRotate == 1){ // 0 --> 1
+                wallKick = [{x: 0, y: 0}, {x: -2, y: 0}, {x: 1, y: 0}, {x: -2, y: 1}, {x: 1, y: -2}];
+            }
+            if(this.activeRotate == 2){ // 1 --> 2
+                wallKick = [{x: 0, y: 0}, {x: -1, y: 0}, {x: 2, y: 0}, {x: -1, y: -2}, {x: 2, y: 1}];
+            }
+            if(this.activeRotate == 3){ // 2 --> 3
+                wallKick = [{x: 0, y: 0}, {x: 2, y: 0}, {x: -1, y: 0}, {x: 2, y: -1}, {x: -1, y: 2}];
+            }
+            if(this.activeRotate == 0){ // 3 --> 0
+                wallKick = [{x: 0, y: 0}, {x: 1, y: 0}, {x: -2, y: 0}, {x: 1, y: 2}, {x: -2, y: -1}];
+            }
+        }
+        else if(type == BlockTypes.J || type == BlockTypes.L || type == BlockTypes.S || type == BlockTypes.Z || type == BlockTypes.T){
+            if(this.activeRotate == 1){ // 0 --> 1
+                wallKick = [{x: 0, y: 0}, {x: -1, y: 0}, {x: -1, y: -1}, {x: 0, y: 2}, {x: -1, y: 2}];
+            }
+            if(this.activeRotate == 2){ // 1 --> 2
+                wallKick = [{x: 0, y: 0}, {x: 1, y: 0}, {x: 1, y: 1}, {x: 0, y: -2}, {x: 1, y: -2}];
+            }
+            if(this.activeRotate == 3){ // 2 --> 3
+                wallKick = [{x: 0, y: 0}, {x: 1, y: 0}, {x: 1, y: -1}, {x: 0, y: 2}, {x: 1, y: 2}];
+            }
+            if(this.activeRotate == 0){ // 3 --> 0
+                wallKick = [{x: 0, y: 0}, {x: -1, y: 0}, {x: -1, y: 1}, {x: 0, y: -2}, {x: -1, y: -2}];
+            }
+        }
+        else if(type == BlockTypes.O){
+            success = true; // Don't need to rotate O blocks
+        }
+
+        for(let kick of wallKick){
+            let canMove = true;
+            for(let block of this.activeBlocks){
+                let x = block.getIndex().x + kick.x;
+                let y = block.getIndex().y + kick.y;
+
+                if(x < 0 || x >= Settings.board.width ||
+                  y > Settings.board.height ||
+                  this.board[y][x] != null){
+                    canMove = false;
+                    break;
+                }
+            }
+            if(canMove){
+                this.activeBlocks.forEach(block => {
+                    block.setIndex(block.getIndex().x + kick.x, block.getIndex().y + kick.y)
+                });
+                this.topLeft.x += kick.x;
+                this.topLeft.y += kick.y;
+                success = true;
+                break;
+            }
+        }
+
+        if(!success){
+            // Rotate back, no places to rotate
+            this.activeBlocks.forEach(block => {
+                block.rotateLeft(this.topLeft);
+            });
+            this.activeRotate = (((this.activeRotate - 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
+        }
     }
 
     public rotateLeft(){
+        if(!this.isActive()){
+            return;
+        }
+        let type = this.activeBlocks[0].getType();
+        this.activeRotate = (((this.activeRotate - 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
+
         this.activeBlocks.forEach(block =>{
             block.rotateLeft(this.topLeft);
         });
+
+        let wallKick: {x: number, y: number}[] = [];
+        let success: boolean = false;
+        if(type == BlockTypes.I){
+            if(this.activeRotate == 0){ // 1 --> 0
+                wallKick = [{x: 0, y: 0}, {x: 2, y: 0}, {x: -1, y: 0}, {x: 2, y: -1}, {x: -1, y: 2}];
+            }
+            if(this.activeRotate == 1){ // 2 --> 1
+                wallKick = [{x: 0, y: 0}, {x: 1, y: 0}, {x: -2, y: 0}, {x: 1, y: 2}, {x: -2, y: -1}];
+            }
+            if(this.activeRotate == 2){ // 3 --> 2
+                wallKick = [{x: 0, y: 0}, {x: -2, y: 0}, {x: 1, y: 0}, {x: -2, y: 1}, {x: 1, y: -2}];
+            }
+            if(this.activeRotate == 3){ // 0 --> 3
+                wallKick = [{x: 0, y: 0}, {x: -1, y: 0}, {x: 2, y: 0}, {x: -1, y: -2}, {x: 2, y: 1}];
+            }
+        }
+        else if(type == BlockTypes.J || type == BlockTypes.L || type == BlockTypes.S || type == BlockTypes.Z || type == BlockTypes.T){
+            if(this.activeRotate == 0){ // 1 --> 0
+                wallKick = [{x: 0, y: 0}, {x: 1, y: 0}, {x: 1, y: 1}, {x: 0, y: -2}, {x: 1, y: -2}];
+            }
+            if(this.activeRotate == 1){ // 2 --> 1
+                wallKick = [{x: 0, y: 0}, {x: -1, y: 0}, {x: -1, y: -1}, {x: 0, y: 2}, {x: -1, y: 2}];
+            }
+            if(this.activeRotate == 2){ // 3 --> 2
+                wallKick = [{x: 0, y: 0}, {x: -1, y: 0}, {x: -1, y: 1}, {x: 0, y: -2}, {x: -1, y: -2}];
+            }
+            if(this.activeRotate == 3){ // 0 --> 3
+                wallKick = [{x: 0, y: 0}, {x: 1, y: 0}, {x: 1, y: -1}, {x: 0, y: 2}, {x: 1, y: 2}];
+            }
+        }
+        else if(type == BlockTypes.O){
+            success = true; // Don't need to rotate O blocks
+        }
+
+        for(let kick of wallKick){
+            let canMove = true;
+            for(let block of this.activeBlocks){
+                let x = block.getIndex().x + kick.x;
+                let y = block.getIndex().y + kick.y;
+
+                if(x < 0 || x >= Settings.board.width ||
+                  y > Settings.board.height ||
+                  this.board[y][x] != null){
+                    canMove = false;
+                    break;
+                }
+            }
+            if(canMove){
+                this.activeBlocks.forEach(block => {
+                    block.setIndex(block.getIndex().x + kick.x, block.getIndex().y + kick.y)
+                });
+                this.topLeft.x += kick.x;
+                this.topLeft.y += kick.y;
+                success = true;
+                break;
+            }
+        }
+
+        if(!success){
+            // Rotate back, no places to rotate
+            this.activeBlocks.forEach(block => {
+                block.rotateRight(this.topLeft);
+            });
+            this.activeRotate = (((this.activeRotate + 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
+        }
     }
 
     public fastDrop(elapsed_time: DOMHighResTimeStamp){
@@ -226,6 +411,8 @@ export default class Board {
     }
 
     public hardDrop(){
-        
+        while(this.isActive()){
+            this.fall();
+        }
     }
 }

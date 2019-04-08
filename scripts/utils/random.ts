@@ -4,7 +4,9 @@ namespace Random {
     }
 
     export function randomInt(min:number, max: number): number {
-        return Math.floor(randomDouble(min, max));
+        Math.floor(min);
+        Math.ceil(max);
+        return Math.floor(randomDouble(min, max + 1));
     }
 
     export function randomCircleVector(min_angle: number, max_angle: number): {x: number, y: number} {

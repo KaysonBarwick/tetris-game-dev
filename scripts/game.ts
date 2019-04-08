@@ -49,7 +49,8 @@ namespace Game {
     input.register_press('ArrowRight', () => board.moveRight());
 
     input.register_press('w', () => board.hardDrop());
-    input.register_press('s', () => board.fastDrop(elapsedTime));
+    // input.register_press('s', () => board.fastDrop(elapsedTime));
+    input.register_press('s', () => board.fall());
     input.register_press('a', () => board.moveLeft());
     input.register_press('d', () => board.moveRight());
     input.register_press('q', () => board.rotateLeft());

@@ -143,4 +143,8 @@ export default class Block extends Object {
     public toggleActive(value: boolean = !this.active) {
         this.active = value;
     }
+
+    public duplicate(): Block {
+        return new Block(this.type, {...this.index});
+    }
 }

@@ -84,6 +84,9 @@ var Graphics;
         Texture.prototype.getHeight = function () {
             return this.image.height;
         };
+        Texture.prototype.setTransparency = function (a) {
+            this.spec.transparency = a;
+        };
         Texture.prototype.draw = function () {
             if (this.ready) {
                 context.save();
@@ -102,9 +105,13 @@ var Graphics;
                     this.spec.subTextureIndex = 0;
                     this.spec.subTextureWidth = this.spec.size.width;
                 }
+                if (this.spec.transparency == null) {
+                    this.spec.transparency = 1;
+                }
                 context.translate(x, y);
                 context.rotate(this.spec.rotation);
                 context.translate(-x, -y);
+                context.globalAlpha = this.spec.transparency;
                 context.drawImage(this.image, this.spec.subTextureWidth * this.spec.subTextureIndex, 0, this.spec.subTextureWidth, this.getHeight(), x - w / 2, y - h / 2, h, w);
                 context.restore();
             }
@@ -198,7 +205,7 @@ define("settings", ["require", "exports"], function (require, exports) {
     var settings = {
         board: { height: 20, width: 10 },
         board_offset: { x: 82, y: 20 },
-        board_width: 500,
+        board_width: 450,
         next_block_count: 4,
         block_respawn_delay: 500,
         fall_rate: 250,
@@ -362,7 +369,9 @@ var Random;
     }
     Random.randomDouble = randomDouble;
     function randomInt(min, max) {
-        return Math.floor(randomDouble(min, max));
+        Math.floor(min);
+        Math.ceil(max);
+        return Math.floor(randomDouble(min, max + 1));
     }
     Random.randomInt = randomInt;
     function randomCircleVector(min_angle, max_angle) {
@@ -694,6 +703,9 @@ define("objects/block", ["require", "exports", "settings", "objects/object"], fu
             if (value === void 0) { value = !this.active; }
             this.active = value;
         };
+        Block.prototype.duplicate = function () {
+            return new Block(this.type, __assign({}, this.index));
+        };
         return Block;
     }(object_1["default"]));
     exports["default"] = Block;
@@ -739,6 +751,34 @@ define("objects/board", ["require", "exports", "objects/block", "settings"], fun
         Board.prototype.getNextBlocks = function () {
             return this.nextBlocks;
         };
+        Board.prototype.getShadowBlocks = function () {
+            var _this = this;
+            var shadowBlocks = [];
+            this.activeBlocks.forEach(function (block) {
+                shadowBlocks.push(block.duplicate());
+            });
+            if (shadowBlocks.length == 0) {
+                return [];
+            }
+            var active = true;
+            // Check for blocks below active blocks
+            while (active) {
+                shadowBlocks.forEach(function (block) {
+                    var x = block.getIndex().x;
+                    var y = block.getIndex().y;
+                    if (y > settings_2["default"].board.height || _this.board[y + 1][x] != null) {
+                        active = false; // Hit bottom or block beneath
+                    }
+                });
+                if (active) {
+                    shadowBlocks.forEach(function (block) {
+                        block.fall();
+                    });
+                }
+            }
+            console.log('after', shadowBlocks);
+            return shadowBlocks;
+        };
         //
         // ------------Game actions------------
         Board.prototype.update = function (elapsed_time) {
@@ -751,10 +791,27 @@ define("objects/board", ["require", "exports", "objects/block", "settings"], fun
                 }
             }
             else {
+                this.popRow();
                 this.blockDelayCarryOver += elapsed_time;
                 if (this.blockDelayCarryOver >= settings_2["default"].block_respawn_delay) {
                     this.blockDelayCarryOver -= settings_2["default"].block_respawn_delay;
                     this.addBlock();
+                }
+            }
+        };
+        Board.prototype.popRow = function () {
+            for (var i = 0; i < this.board.length; ++i) {
+                var shouldPop = true;
+                for (var j = 0; j < this.board[i].length; j++) {
+                    if (this.board[i][j] == null) {
+                        shouldPop = false;
+                        break;
+                    }
+                }
+                if (shouldPop) {
+                    for (var j = 0; j < this.board[i].length; j++) {
+                        this.board[i][j] = null;
+                    }
                 }
             }
         };
@@ -814,6 +871,9 @@ define("objects/board", ["require", "exports", "objects/block", "settings"], fun
         };
         Board.prototype.fall = function () {
             var _this = this;
+            if (!this.isActive()) {
+                return;
+            }
             var active = true;
             // Check for blocks below active blocks
             this.activeBlocks.forEach(function (block) {
@@ -842,6 +902,9 @@ define("objects/board", ["require", "exports", "objects/block", "settings"], fun
         // ------------Player Actions------------
         Board.prototype.moveLeft = function () {
             var _this = this;
+            if (!this.isActive()) {
+                return;
+            }
             var canMove = true;
             this.activeBlocks.forEach(function (block) {
                 var x = block.getIndex().x;
@@ -859,6 +922,9 @@ define("objects/board", ["require", "exports", "objects/block", "settings"], fun
         };
         Board.prototype.moveRight = function () {
             var _this = this;
+            if (!this.isActive()) {
+                return;
+            }
             var canMove = true;
             this.activeBlocks.forEach(function (block) {
                 var x = block.getIndex().x;
@@ -875,35 +941,174 @@ define("objects/board", ["require", "exports", "objects/block", "settings"], fun
             }
         };
         Board.prototype.rotateRight = function () {
-            //let type = this.activeBlocks[0].getType();
             var _this = this;
-            //let next_active: Block[] = this.activeBlocks.slice();
-            // let next_rotate: number = this.activeRotate + 1 % 4;
-            // let success: boolean = false;
-            // if(type == BlockTypes.I){
-            // }
-            // else if(type == BlockTypes.J || type == BlockTypes.L || type == BlockTypes.S || type == BlockTypes.Z || type == BlockTypes.T){
-            // }
-            // else if(type == BlockTypes.O){
-            //     success = true;
-            // }
-            // if(success){
-            //     this.activeBlocks = next_active;
-            //     this.activeRotate = next_rotate;
-            // }
+            if (!this.isActive()) {
+                return;
+            }
+            var type = this.activeBlocks[0].getType();
+            this.activeRotate = (((this.activeRotate + 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
             this.activeBlocks.forEach(function (block) {
                 block.rotateRight(_this.topLeft);
             });
+            var wallKick = [];
+            var success = false;
+            if (type == block_1.BlockTypes.I) {
+                if (this.activeRotate == 1) { // 0 --> 1
+                    wallKick = [{ x: 0, y: 0 }, { x: -2, y: 0 }, { x: 1, y: 0 }, { x: -2, y: 1 }, { x: 1, y: -2 }];
+                }
+                if (this.activeRotate == 2) { // 1 --> 2
+                    wallKick = [{ x: 0, y: 0 }, { x: -1, y: 0 }, { x: 2, y: 0 }, { x: -1, y: -2 }, { x: 2, y: 1 }];
+                }
+                if (this.activeRotate == 3) { // 2 --> 3
+                    wallKick = [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: -1, y: 0 }, { x: 2, y: -1 }, { x: -1, y: 2 }];
+                }
+                if (this.activeRotate == 0) { // 3 --> 0
+                    wallKick = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: -2, y: 0 }, { x: 1, y: 2 }, { x: -2, y: -1 }];
+                }
+            }
+            else if (type == block_1.BlockTypes.J || type == block_1.BlockTypes.L || type == block_1.BlockTypes.S || type == block_1.BlockTypes.Z || type == block_1.BlockTypes.T) {
+                if (this.activeRotate == 1) { // 0 --> 1
+                    wallKick = [{ x: 0, y: 0 }, { x: -1, y: 0 }, { x: -1, y: -1 }, { x: 0, y: 2 }, { x: -1, y: 2 }];
+                }
+                if (this.activeRotate == 2) { // 1 --> 2
+                    wallKick = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: -2 }, { x: 1, y: -2 }];
+                }
+                if (this.activeRotate == 3) { // 2 --> 3
+                    wallKick = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: -1 }, { x: 0, y: 2 }, { x: 1, y: 2 }];
+                }
+                if (this.activeRotate == 0) { // 3 --> 0
+                    wallKick = [{ x: 0, y: 0 }, { x: -1, y: 0 }, { x: -1, y: 1 }, { x: 0, y: -2 }, { x: -1, y: -2 }];
+                }
+            }
+            else if (type == block_1.BlockTypes.O) {
+                success = true; // Don't need to rotate O blocks
+            }
+            var _loop_1 = function (kick) {
+                var canMove = true;
+                for (var _i = 0, _a = this_1.activeBlocks; _i < _a.length; _i++) {
+                    var block = _a[_i];
+                    var x = block.getIndex().x + kick.x;
+                    var y = block.getIndex().y + kick.y;
+                    if (x < 0 || x >= settings_2["default"].board.width ||
+                        y > settings_2["default"].board.height ||
+                        this_1.board[y][x] != null) {
+                        canMove = false;
+                        break;
+                    }
+                }
+                if (canMove) {
+                    this_1.activeBlocks.forEach(function (block) {
+                        block.setIndex(block.getIndex().x + kick.x, block.getIndex().y + kick.y);
+                    });
+                    this_1.topLeft.x += kick.x;
+                    this_1.topLeft.y += kick.y;
+                    success = true;
+                    return "break";
+                }
+            };
+            var this_1 = this;
+            for (var _i = 0, wallKick_1 = wallKick; _i < wallKick_1.length; _i++) {
+                var kick = wallKick_1[_i];
+                var state_1 = _loop_1(kick);
+                if (state_1 === "break")
+                    break;
+            }
+            if (!success) {
+                // Rotate back, no places to rotate
+                this.activeBlocks.forEach(function (block) {
+                    block.rotateLeft(_this.topLeft);
+                });
+                this.activeRotate = (((this.activeRotate - 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
+            }
         };
         Board.prototype.rotateLeft = function () {
             var _this = this;
+            if (!this.isActive()) {
+                return;
+            }
+            var type = this.activeBlocks[0].getType();
+            this.activeRotate = (((this.activeRotate - 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
+            console.log(this.activeRotate, -1 % 4);
             this.activeBlocks.forEach(function (block) {
                 block.rotateLeft(_this.topLeft);
             });
+            var wallKick = [];
+            var success = false;
+            if (type == block_1.BlockTypes.I) {
+                if (this.activeRotate == 0) { // 1 --> 0
+                    wallKick = [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: -1, y: 0 }, { x: 2, y: -1 }, { x: -1, y: 2 }];
+                }
+                if (this.activeRotate == 1) { // 2 --> 1
+                    wallKick = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: -2, y: 0 }, { x: 1, y: 2 }, { x: -2, y: -1 }];
+                }
+                if (this.activeRotate == 2) { // 3 --> 2
+                    wallKick = [{ x: 0, y: 0 }, { x: -2, y: 0 }, { x: 1, y: 0 }, { x: -2, y: 1 }, { x: 1, y: -2 }];
+                }
+                if (this.activeRotate == 3) { // 0 --> 3
+                    wallKick = [{ x: 0, y: 0 }, { x: -1, y: 0 }, { x: 2, y: 0 }, { x: -1, y: -2 }, { x: 2, y: 1 }];
+                }
+            }
+            else if (type == block_1.BlockTypes.J || type == block_1.BlockTypes.L || type == block_1.BlockTypes.S || type == block_1.BlockTypes.Z || type == block_1.BlockTypes.T) {
+                if (this.activeRotate == 0) { // 1 --> 0
+                    wallKick = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: -2 }, { x: 1, y: -2 }];
+                }
+                if (this.activeRotate == 1) { // 2 --> 1
+                    wallKick = [{ x: 0, y: 0 }, { x: -1, y: 0 }, { x: -1, y: -1 }, { x: 0, y: 2 }, { x: -1, y: 2 }];
+                }
+                if (this.activeRotate == 2) { // 3 --> 2
+                    wallKick = [{ x: 0, y: 0 }, { x: -1, y: 0 }, { x: -1, y: 1 }, { x: 0, y: -2 }, { x: -1, y: -2 }];
+                }
+                if (this.activeRotate == 3) { // 0 --> 3
+                    wallKick = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: -1 }, { x: 0, y: 2 }, { x: 1, y: 2 }];
+                }
+            }
+            else if (type == block_1.BlockTypes.O) {
+                success = true; // Don't need to rotate O blocks
+            }
+            var _loop_2 = function (kick) {
+                var canMove = true;
+                for (var _i = 0, _a = this_2.activeBlocks; _i < _a.length; _i++) {
+                    var block = _a[_i];
+                    var x = block.getIndex().x + kick.x;
+                    var y = block.getIndex().y + kick.y;
+                    if (x < 0 || x >= settings_2["default"].board.width ||
+                        y > settings_2["default"].board.height ||
+                        this_2.board[y][x] != null) {
+                        canMove = false;
+                        break;
+                    }
+                }
+                if (canMove) {
+                    this_2.activeBlocks.forEach(function (block) {
+                        block.setIndex(block.getIndex().x + kick.x, block.getIndex().y + kick.y);
+                    });
+                    this_2.topLeft.x += kick.x;
+                    this_2.topLeft.y += kick.y;
+                    success = true;
+                    return "break";
+                }
+            };
+            var this_2 = this;
+            for (var _i = 0, wallKick_2 = wallKick; _i < wallKick_2.length; _i++) {
+                var kick = wallKick_2[_i];
+                var state_2 = _loop_2(kick);
+                if (state_2 === "break")
+                    break;
+            }
+            if (!success) {
+                // Rotate back, no places to rotate
+                this.activeBlocks.forEach(function (block) {
+                    block.rotateRight(_this.topLeft);
+                });
+                this.activeRotate = (((this.activeRotate + 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
+            }
         };
         Board.prototype.fastDrop = function (elapsed_time) {
         };
         Board.prototype.hardDrop = function () {
+            while (this.isActive()) {
+                this.fall();
+            }
         };
         return Board;
     }());
@@ -930,6 +1135,9 @@ define("graphics/sprite-sheet", ["require", "exports"], function (require, expor
             this.image.spec.subTextureIndex = index;
             this.image.draw();
         };
+        SpriteSheet.prototype.setTransparency = function (a) {
+            this.image.setTransparency(a);
+        };
         return SpriteSheet;
     }());
     exports["default"] = SpriteSheet;
@@ -941,7 +1149,14 @@ define("render/block_renderer", ["require", "exports", "graphics/sprite-sheet"],
         function BlockRenderer() {
             this.sprites = new sprite_sheet_1["default"]('./assets/blocks.png', 7);
         }
-        BlockRenderer.prototype.render = function (block) {
+        BlockRenderer.prototype.render = function (block, shadow) {
+            if (shadow === void 0) { shadow = false; }
+            if (shadow) {
+                this.sprites.setTransparency(0.5);
+            }
+            else {
+                this.sprites.setTransparency(1);
+            }
             this.sprites.render({
                 center: block.getCenter(),
                 size: block.getSize()
@@ -1059,6 +1274,13 @@ define("render/board_renderer", ["require", "exports", "render/block_renderer"],
                     _this.block_renderer.render(block);
                 }
             });
+            var shadowBlocks = board.getShadowBlocks();
+            // Check for blocks below active blocks
+            shadowBlocks.forEach(function (block) {
+                if (block && block.getIndex().y > 1) {
+                    _this.block_renderer.render(block, true);
+                }
+            });
         };
         return BoardRenderer;
     }());
@@ -1098,7 +1320,8 @@ define("game", ["require", "exports", "utils/input", "utils/scores", "utils/time
         input.register_press('ArrowLeft', function () { return board.moveLeft(); });
         input.register_press('ArrowRight', function () { return board.moveRight(); });
         input.register_press('w', function () { return board.hardDrop(); });
-        input.register_press('s', function () { return board.fastDrop(elapsedTime); });
+        // input.register_press('s', () => board.fastDrop(elapsedTime));
+        input.register_press('s', function () { return board.fall(); });
         input.register_press('a', function () { return board.moveLeft(); });
         input.register_press('d', function () { return board.moveRight(); });
         input.register_press('q', function () { return board.rotateLeft(); });
