@@ -88,7 +88,9 @@ namespace Graphics {
             this.image.src = spec.src;
             this.image.onload = () => { 
                 this.ready = true; 
-                this.spec.onload() 
+                if(this.spec.onload){
+                    this.spec.onload() 
+                }
             };
         }
 
@@ -121,7 +123,7 @@ namespace Graphics {
                 }
                 if(this.spec.subTextureIndex == null || this.spec.subTextureWidth == null){
                     this.spec.subTextureIndex = 0;
-                    this.spec.subTextureWidth = this.spec.size.width;
+                    this.spec.subTextureWidth = this.getWidth();
                 }
                 if(this.spec.transparency == null){
                     this.spec.transparency = 1;
@@ -136,7 +138,7 @@ namespace Graphics {
                     this.spec.subTextureWidth * this.spec.subTextureIndex, 0,
                     this.spec.subTextureWidth, this.getHeight(),
                     x - w/2, y - h/2,
-                    h, w);
+                    w, h);
                 context.restore();
             }
         }

@@ -3,10 +3,12 @@
 import Block, { BlockTypes } from './block';
 
 import Settings from '../settings';
+import BlockAnimator from '../render/block_animator';
 
 export default class Board {
     private board: Block[][] = [];
     private nextBlocks: BlockTypes[] = [];
+    private toFall: Block[] = [];
 
     private activeBlocks: Block[] = [];
     private activeRotate: number = 0; // 0 = rotate 0, 1 = rotate 90, 2 = rotate 180, 3 = rotate -90
@@ -14,6 +16,8 @@ export default class Board {
 
     private fallCarryOver: number = 0;
     private blockDelayCarryOver: number = 0;
+
+    private blockAnimator = new BlockAnimator();
 
     constructor(private level: number = 1){
         // board[0] and board[1] will be off screen and used to detect loss and
@@ -80,9 +84,27 @@ export default class Board {
         return shadowBlocks;
     }
 
+    public getBlockAnimator(): BlockAnimator{
+        return this.blockAnimator;
+    }
+
     //
     // ------------Game actions------------
     public update(elapsed_time: DOMHighResTimeStamp){
+        this.blockAnimator.update(elapsed_time);
+        if(this.blockAnimator.isPopping()){
+            return;
+        }
+        else {
+            this.toFall.forEach(block => {
+                let x = block.getIndex().x;
+                let y = block.getIndex().y;
+                this.board[y + 1][x] = block;
+                this.board[y][x] = null;
+                block.fall();
+            });
+            this.toFall = [];
+        }
         if(this.isActive()){
             this.fallCarryOver += elapsed_time;
             let fall_rate = Settings.fall_rate - Settings.fall_rate_per_level * this.level;
@@ -112,8 +134,15 @@ export default class Board {
             }
             if(shouldPop){
                 for(let j = 0; j < this.board[i].length; j++){
-                    
+                    this.blockAnimator.popBlock(this.board[i][j]);
                     this.board[i][j] = null;
+                }
+                for(let row = i; row >= 0; --row){
+                    for(let j = 0; j < this.board[row].length; j++){
+                        if(this.board[row][j]){
+                            this.toFall.push(this.board[row][j]);
+                        }
+                    }
                 }
             }
         }
@@ -407,7 +436,7 @@ export default class Board {
     }
 
     public fastDrop(elapsed_time: DOMHighResTimeStamp){
-
+        this.fallCarryOver += Settings.fast_drop_rate * elapsed_time;
     }
 
     public hardDrop(){

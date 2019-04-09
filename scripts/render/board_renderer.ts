@@ -14,6 +14,7 @@ export default class BoardRenderer {
                 }
             });
         });
+
         board.getActiveBlocks().forEach(block => {
             if(block && block.getIndex().y > 1){
                 this.block_renderer.render(block);
@@ -28,5 +29,6 @@ export default class BoardRenderer {
             }
         });
 
+        board.getBlockAnimator().render();
     }
 }

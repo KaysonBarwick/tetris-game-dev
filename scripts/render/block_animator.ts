@@ -4,7 +4,7 @@ import Settings from "../settings";
 import Block from '../objects/block';
 import Animator from "../graphics/animated-model";
 
-export default class BlockRenderer {
+export default class BlockAnimator {
     private pop_frames: number = 8;
     private time_per_frame: number[] = [200,200,200,200,200,200,200,250];
     private sprites = [
@@ -21,6 +21,10 @@ export default class BlockRenderer {
 
     public popBlock(block: Block){
         this.popBlocks.push(new Animator(block, this.sprites[block.getType()], this.pop_frames, this.time_per_frame, 1));
+    }
+
+    public isPopping(): boolean{
+        return this.popBlocks.length > 0;
     }
 
     public update(elapsed_time: DOMHighResTimeStamp){

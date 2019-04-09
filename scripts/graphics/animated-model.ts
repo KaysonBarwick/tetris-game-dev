@@ -13,7 +13,7 @@ export default class AnimatedModel {
             src: src,
             center: {x: 0, y: 0},
             subTextureIndex: 0,
-            onload: () => { this.image.spec.subTextureWidth = this.image.getWidth() / this.spriteCount; console.log(this.image) }
+            onload: () => { this.image.spec.subTextureWidth = this.image.getWidth() / this.spriteCount }
         });
     }
 

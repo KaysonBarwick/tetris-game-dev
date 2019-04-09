@@ -21,13 +21,13 @@ export default class Block extends Object {
     }
 
     public getCenter() {
-        let x = this.getIndex().x * Settings.block_size + Settings.board_offset.x;
-        let y = (this.getIndex().y - 2) * Settings.block_size + Settings.board_offset.y
+        let x = ((this.getIndex().x) * Settings.block_size.width) + (Settings.block_size.width / 2) + Settings.board_offset.x;
+        let y = ((this.getIndex().y - 2) * Settings.block_size.height) + (Settings.block_size.height / 2) + Settings.board_offset.y;
         return {x, y};
     }
 
     public getSize() {
-        return {height: Settings.block_size, width: Settings.block_size};
+        return {height: Settings.block_size.height, width: Settings.block_size.width};
     }
 
     public fall(){

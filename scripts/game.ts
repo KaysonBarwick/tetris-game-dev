@@ -23,34 +23,18 @@ namespace Game {
     let input = new Input();
     let timer = new Timer('div-timer');
 
-    let block_renderer = new BlockRenderer();
-    let block_animator = new BlockAnimator();
     let board_renderer = new BoardRenderer();
 
     let board = new Board();
 
-    let block = new Block(BlockTypes.I, {x: 1, y: 1});
-    let block2 = new Block(BlockTypes.J, {x: 2, y: 1});
-    let block3 = new Block(BlockTypes.S, {x: 3, y: 1});
-    let block4 = new Block(BlockTypes.Z, {x: 4, y: 1});
-    let block5 = new Block(BlockTypes.L, {x: 5, y: 1});
-    let block6 = new Block(BlockTypes.O, {x: 6, y: 1});
-    let block7 = new Block(BlockTypes.T, {x: 7, y: 1});
-    block_animator.popBlock(block2);
-    block_animator.popBlock(block3);
-    block_animator.popBlock(block4);
-    block_animator.popBlock(block5);
-    block_animator.popBlock(block6);
-    block_animator.popBlock(block7);
-
     input.register_press('ArrowUp', () => board.hardDrop());
-    input.register_press('ArrowDown', () => board.fastDrop(elapsedTime));
+    input.register_hold('ArrowDown', () => board.fastDrop(elapsedTime));
     input.register_press('ArrowLeft', () => board.moveLeft());
     input.register_press('ArrowRight', () => board.moveRight());
 
     input.register_press('w', () => board.hardDrop());
     // input.register_press('s', () => board.fastDrop(elapsedTime));
-    input.register_press('s', () => board.fall());
+    input.register_hold('s', () => board.fastDrop(elapsedTime));
     input.register_press('a', () => board.moveLeft());
     input.register_press('d', () => board.moveRight());
     input.register_press('q', () => board.rotateLeft());
@@ -58,10 +42,20 @@ namespace Game {
 
     input.register_press('Escape', () => pause());
 
+    let backgroundImage: Graphics.Texture;
 
-    function init(){
+
+    function init(bg: string = 'raven.png'){
         Score.resetScore();
         timer.resetTime();
+        board = new Board();
+
+        backgroundImage = new Graphics.Texture({
+            src: 'assets/player_backgrounds/' + bg,
+            center: {x: Graphics.canvas.width / 2, y: Graphics.canvas.height / 2},
+            size: {height: Graphics.canvas.height, width: Graphics.canvas.width}
+        });
+        console.log(Graphics.canvas.width, Graphics.canvas.height)
     }
 
     function run(){
@@ -74,7 +68,7 @@ namespace Game {
 
     function pause(){
         nextFrame = false;
-        Screens.showSubScreen('sub-screen-pause');
+        Screens.showScreen('sub-screen-pause');
     }
 
     function quit(){
@@ -90,14 +84,12 @@ namespace Game {
         // Update Objects
         board.update(elapsedTime);
         Particles.update(elapsedTime);
-        block_animator.update(elapsedTime);
         timer.updateTime(elapsedTime);
     }
 
     function render(){
         Graphics.clear();
-        block_animator.render();
-        block_renderer.render(block);
+        backgroundImage.draw();
         board_renderer.render(board);
         Particles.render();
     }
