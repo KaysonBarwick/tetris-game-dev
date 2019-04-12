@@ -16,7 +16,7 @@ export enum BlockTypes {
 export default class Block extends Object {
     private active: boolean = true;
 
-    constructor(private type: BlockTypes, private index: {x: number, y: number}){
+    constructor(private type: BlockTypes, private index: {x: number, y: number}, private group_id){
         super();
     }
 
@@ -31,7 +31,9 @@ export default class Block extends Object {
     }
 
     public fall(){
-        this.index.y++;
+        if(this.index.y < Settings.board.height + 2){
+            this.index.y++;
+        }
     }
 
     public moveRight(){
@@ -40,6 +42,10 @@ export default class Block extends Object {
 
     public moveLeft(){
         this.index.x--;
+    }
+    
+    public getGroupID(){
+        return this.group_id;
     }
 
     public rotateRight(topLeft: {x: number, y: number}){
@@ -145,6 +151,6 @@ export default class Block extends Object {
     }
 
     public duplicate(): Block {
-        return new Block(this.type, {...this.index});
+        return new Block(this.type, {...this.index}, this.group_id);
     }
 }

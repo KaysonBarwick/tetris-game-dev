@@ -4,12 +4,14 @@ import Block, { BlockTypes } from './block';
 
 import Settings from '../settings';
 import BlockAnimator from '../render/block_animator';
+import Particles from '../graphics/particles'
 
 export default class Board {
     private board: Block[][] = [];
-    private nextBlocks: BlockTypes[] = [];
+    private nextBlocks: Block[][] = [];
     private toFall: Block[] = [];
 
+    private next_group_id = 1;
     private activeBlocks: Block[] = [];
     private activeRotate: number = 0; // 0 = rotate 0, 1 = rotate 90, 2 = rotate 180, 3 = rotate -90
     private topLeft: {x: number, y: number};
@@ -19,7 +21,10 @@ export default class Board {
 
     private blockAnimator = new BlockAnimator();
 
-    constructor(private level: number = 1){
+    private cleared: number = 0;
+    private score: number = 0;
+
+    constructor(private level: number = 0){
         // board[0] and board[1] will be off screen and used to detect loss and
         // make the blocks appear to fall onto the screen.
         for(let i = 0; i <= Settings.board.height + 1; i++){
@@ -29,10 +34,7 @@ export default class Board {
             }
             this.board.push(row);
         }
-
-        for(let i = 0; i < Settings.next_block_count; ++i){
-            this.nextBlocks.push(Random.randomInt(0, 6));
-        }
+        this.activeBlocks = this.nextBlock();
     }
     
     //
@@ -49,7 +51,7 @@ export default class Board {
         return this.activeBlocks;
     }
 
-    public getNextBlocks(): BlockTypes[] {
+    public getNextBlocks(): Block[][] {
         return this.nextBlocks;
     }
 
@@ -88,21 +90,92 @@ export default class Board {
         return this.blockAnimator;
     }
 
+    public getLevel(): number {
+        return this.level;
+    }
+
+    public getScore(): number {
+        return this.score;
+    }
+
+    public getRowsCleared(): number {
+        return this.cleared;
+    }
+
+    public isGameOver(): boolean {
+        let gameOver: boolean = false;
+        this.board[0].forEach(block => {
+            if(block){
+                gameOver = true;
+                return;
+            }
+        });
+        return gameOver;
+    }
+
     //
     // ------------Game actions------------
     public update(elapsed_time: DOMHighResTimeStamp){
+        this.level = Math.floor(this.cleared / Settings.rows_per_level);
+
         this.blockAnimator.update(elapsed_time);
         if(this.blockAnimator.isPopping()){
+            this.popRow();
             return;
         }
         else {
+            let groups = {};
             this.toFall.forEach(block => {
+                // Remove fall blocks from board and find groups
                 let x = block.getIndex().x;
                 let y = block.getIndex().y;
-                this.board[y + 1][x] = block;
                 this.board[y][x] = null;
-                block.fall();
+
+                let id =  block.getGroupID();
+                if(groups.hasOwnProperty(id)){
+                    groups[id].push(block);
+                }
+                else{
+                    groups[id] = [block];
+                }
             });
+            while(this.toFall.length > 0){
+                this.toFall.forEach(block => {
+                    block.fall();
+                });
+                let locking = true;
+                while(locking){
+                    locking = false;
+                    for(let id in groups){
+                        if(groups.hasOwnProperty(id)){
+                            // Check if group hit bottom
+                            let active = true;
+                            groups[id].forEach(block => {
+                                let x = block.getIndex().x;
+                                let y = block.getIndex().y;
+                                if(y >= this.board.length - 1 || this.board[y + 1][x] != null){
+                                    active = false; // Hit bottom or block beneath
+                                }
+                            });
+                            if(!active){
+                                // Group hit bottom
+                                locking = true;
+                                // Add to board
+                                groups[id].forEach(block => {
+                                    this.board[block.getIndex().y][block.getIndex().x] = block;
+                                    this.toFall.splice(this.toFall.indexOf(block), 1);
+                                });
+                                Particles.addBlockPlace(groups[id]);
+
+                                // Remove from falling and groups
+                                delete groups[id];
+                            }
+                        }
+                    }
+                }
+
+            }
+
             this.toFall = [];
         }
         if(this.isActive()){
@@ -118,12 +191,13 @@ export default class Board {
             this.blockDelayCarryOver += elapsed_time;
             if(this.blockDelayCarryOver >= Settings.block_respawn_delay){
                 this.blockDelayCarryOver -= Settings.block_respawn_delay;
-                this.addBlock();
+                this.activeBlocks = this.nextBlock();
             }
         }
     }
 
     private popRow(){
+        let popped = 0;
         for(let i = 0; i < this.board.length; ++i){
             let shouldPop = true;
             for(let j = 0; j < this.board[i].length; j++){
@@ -133,6 +207,8 @@ export default class Board {
                 }
             }
             if(shouldPop){
+                popped++;
+                this.cleared++;
                 for(let j = 0; j < this.board[i].length; j++){
                     this.blockAnimator.popBlock(this.board[i][j]);
                     this.board[i][j] = null;
@@ -146,64 +222,81 @@ export default class Board {
                 }
             }
         }
-    }
 
-    private nextBlock(): BlockTypes {
-        let next = this.nextBlocks.shift();
-        this.nextBlocks.push(Random.randomInt(0, 6));
-        return next;
-    }
-
-    private addBlock(){
-        let type = this.nextBlock();
-        let middle = Math.floor(Settings.board.width / 2);
-
-        this.activeRotate = 0;
-        this.topLeft = {x: middle - 1, y: 0};        
-
-        switch(type){
-            case BlockTypes.L:
-                this.activeBlocks.push(new Block(BlockTypes.L, {x: middle - 1, y: 0}));
-                for(let i = middle - 1; i <= middle + 1; ++i){
-                    this.activeBlocks.push(new Block(BlockTypes.L, {x: i, y: 1}));
-                }
-                break;
-            case BlockTypes.I:
-                for(let i = middle - 1; i <= middle + 2; ++i){
-                    this.activeBlocks.push(new Block(BlockTypes.I, {x: i, y: 1}));
-                }
-                break;
-            case BlockTypes.O:
-                this.activeBlocks.push(new Block(BlockTypes.O, {x: middle, y: 0}));
-                this.activeBlocks.push(new Block(BlockTypes.O, {x: middle + 1, y: 0}));
-                this.activeBlocks.push(new Block(BlockTypes.O, {x: middle, y: 1}));
-                this.activeBlocks.push(new Block(BlockTypes.O, {x: middle + 1, y: 1}));
-                break;
-            case BlockTypes.T:
-                this.activeBlocks.push(new Block(BlockTypes.T, {x: middle, y: 0}));
-                for(let i = middle - 1; i <= middle + 1; ++i){
-                    this.activeBlocks.push(new Block(BlockTypes.T, {x: i, y: 1}));
-                }
-                break;
-            case BlockTypes.S:
-                this.activeBlocks.push(new Block(BlockTypes.S, {x: middle, y: 0}));
-                this.activeBlocks.push(new Block(BlockTypes.S, {x: middle + 1, y: 0}));
-                this.activeBlocks.push(new Block(BlockTypes.S, {x: middle, y: 1}));
-                this.activeBlocks.push(new Block(BlockTypes.S, {x: middle - 1, y: 1}));
-                break;
-            case BlockTypes.J:
-            this.activeBlocks.push(new Block(BlockTypes.J, {x: middle + 1, y: 0}));
-                for(let i = middle - 1; i <= middle + 1; ++i){
-                    this.activeBlocks.push(new Block(BlockTypes.J, {x: i, y: 1}));
-                }
-                break;
-            case BlockTypes.Z:
-                this.activeBlocks.push(new Block(BlockTypes.Z, {x: middle, y: 0}));
-                this.activeBlocks.push(new Block(BlockTypes.Z, {x: middle - 1, y: 0}));
-                this.activeBlocks.push(new Block(BlockTypes.Z, {x: middle, y: 1}));
-                this.activeBlocks.push(new Block(BlockTypes.Z, {x: middle + 1, y: 1}));
-                break;
+        
+        if(popped == 1){
+            this.score += 40 * (this.level + 1)
         }
+        if(popped == 2){
+            this.score += 100 * (this.level + 1)
+        }
+        if(popped == 3){
+            this.score += 300 * (this.level + 1)
+        }
+        if(popped == 4){
+            this.score += 1200 * (this.level + 1)
+        }
+    }
+
+    private nextBlock(): Block[] {
+        // Add a blocks to next
+        while(this.nextBlocks.length <= Settings.next_block_count){
+            let type = Random.randomInt(0, 6);
+            let middle = Math.floor(Settings.board.width / 2);
+
+            this.activeRotate = 0;
+            this.topLeft = {x: middle - 1, y: 0};        
+            
+            let blocks: Block[] = []
+            switch(type){
+                case BlockTypes.L:
+                    blocks.push(new Block(BlockTypes.L, {x: middle - 1, y: 0}, this.next_group_id));
+                    for(let i = middle - 1; i <= middle + 1; ++i){
+                        blocks.push(new Block(BlockTypes.L, {x: i, y: 1}, this.next_group_id));
+                    }
+                    break;
+                case BlockTypes.I:
+                    for(let i = middle - 1; i <= middle + 2; ++i){
+                        blocks.push(new Block(BlockTypes.I, {x: i, y: 1}, this.next_group_id));
+                    }
+                    break;
+                case BlockTypes.O:
+                    blocks.push(new Block(BlockTypes.O, {x: middle, y: 0}, this.next_group_id));
+                    blocks.push(new Block(BlockTypes.O, {x: middle + 1, y: 0}, this.next_group_id));
+                    blocks.push(new Block(BlockTypes.O, {x: middle, y: 1}, this.next_group_id));
+                    blocks.push(new Block(BlockTypes.O, {x: middle + 1, y: 1}, this.next_group_id));
+                    break;
+                case BlockTypes.T:
+                    blocks.push(new Block(BlockTypes.T, {x: middle, y: 0}, this.next_group_id));
+                    for(let i = middle - 1; i <= middle + 1; ++i){
+                        blocks.push(new Block(BlockTypes.T, {x: i, y: 1}, this.next_group_id));
+                    }
+                    break;
+                case BlockTypes.S:
+                    blocks.push(new Block(BlockTypes.S, {x: middle, y: 0}, this.next_group_id));
+                    blocks.push(new Block(BlockTypes.S, {x: middle + 1, y: 0}, this.next_group_id));
+                    blocks.push(new Block(BlockTypes.S, {x: middle, y: 1}, this.next_group_id));
+                    blocks.push(new Block(BlockTypes.S, {x: middle - 1, y: 1}, this.next_group_id));
+                    break;
+                case BlockTypes.J:
+                    blocks.push(new Block(BlockTypes.J, {x: middle + 1, y: 0}, this.next_group_id));
+                    for(let i = middle - 1; i <= middle + 1; ++i){
+                        blocks.push(new Block(BlockTypes.J, {x: i, y: 1}, this.next_group_id));
+                    }
+                    break;
+                case BlockTypes.Z:
+                    blocks.push(new Block(BlockTypes.Z, {x: middle, y: 0}, this.next_group_id));
+                    blocks.push(new Block(BlockTypes.Z, {x: middle - 1, y: 0}, this.next_group_id));
+                    blocks.push(new Block(BlockTypes.Z, {x: middle, y: 1}, this.next_group_id));
+                    blocks.push(new Block(BlockTypes.Z, {x: middle + 1, y: 1}, this.next_group_id));
+                    break;
+            }
+            this.nextBlocks.push(blocks);
+            this.next_group_id++;
+        }
+
+        let next = this.nextBlocks.shift();
+        return next;
     }
 
     public fall(){
@@ -215,7 +308,7 @@ export default class Board {
         this.activeBlocks.forEach(block => {
             let x = block.getIndex().x;
             let y = block.getIndex().y;
-            if(y > Settings.board.height || this.board[y + 1][x] != null){
+            if(y >= this.board.length - 1 || this.board[y + 1][x] != null){
                 active = false; // Hit bottom or block beneath
             }
         });
@@ -230,8 +323,10 @@ export default class Board {
         else {
             // Deactivate blocks by moving them to board
             this.activeBlocks.forEach(block => {
+                console.log(this, block);
                 this.board[block.getIndex().y][block.getIndex().x] = block;
             });
+            Particles.addBlockPlace(this.activeBlocks);
             this.activeBlocks = [];
         }
     }

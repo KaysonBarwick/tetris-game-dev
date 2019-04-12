@@ -5,13 +5,20 @@ let pixel = {width: canvas.width / bg.width, height: canvas.height / bg.height};
 let board_size = { height: 192 * pixel.height, width: 96 * pixel.width};
 
 let settings = {
+    pixel,
     board: { height: 20, width: 10 },
+
     board_offset: {x: 88 * pixel.width, y: 23 * pixel.height},
+    info_box: {x: 16 * pixel.width, y: 23 * pixel.height},
+    next_box: {x: 192 * pixel.width, y: 31 * pixel.height },
+
+
     next_block_count: 4,
     block_respawn_delay: 500,
 
     fall_rate: 500,
     fall_rate_per_level: 50,
+    rows_per_level: 10,
 
     fast_drop_rate: 7, //extra milliseconds per millisecond
 

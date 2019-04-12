@@ -13,8 +13,11 @@ import Board from './objects/board';
 import BlockRenderer from './render/block_renderer';
 import BlockAnimator from './render/block_animator';
 import BoardRenderer from './render/board_renderer';
+import NextBlockRenderer from './render/next_block_renderer';
+import score from './utils/scores';
 
 namespace Game {
+    let character: string;
 
     let prevTime: DOMHighResTimeStamp;
     let nextFrame: boolean = false;
@@ -24,6 +27,7 @@ namespace Game {
     let timer = new Timer('div-timer');
 
     let board_renderer = new BoardRenderer();
+    let nextBlockRenderer = new NextBlockRenderer();
 
     let board = new Board();
 
@@ -45,21 +49,24 @@ namespace Game {
     let backgroundImage: Graphics.Texture;
 
 
-    function init(bg: string = 'raven.png'){
+    function init(){
         Score.resetScore();
         timer.resetTime();
         board = new Board();
+    }
 
+    function run(params: {char: string, init?: boolean} = {char: 'yoshi', init: false}){
+        character = params.char;
         backgroundImage = new Graphics.Texture({
-            src: 'assets/player_backgrounds/' + bg,
+            src: 'assets/player_backgrounds/' + character + '.png',
             center: {x: Graphics.canvas.width / 2, y: Graphics.canvas.height / 2},
             size: {height: Graphics.canvas.height, width: Graphics.canvas.width}
         });
-        console.log(Graphics.canvas.width, Graphics.canvas.height)
-    }
-
-    function run(){
         // (<HTMLAudioElement>document.getElementById('myMusic')).play();
+
+        if(params.init){
+            init();
+        }
 
         nextFrame = true;
         prevTime = performance.now();
@@ -85,11 +92,24 @@ namespace Game {
         board.update(elapsedTime);
         Particles.update(elapsedTime);
         timer.updateTime(elapsedTime);
+
+        if(board.isGameOver()){
+            console.log('gameOver');
+            score.addScore(board.getScore());
+            gameOver();
+        }
     }
 
     function render(){
         Graphics.clear();
         backgroundImage.draw();
+
+        Graphics.writeText("Level: " + board.getLevel(), {x: Settings.info_box.x + Settings.pixel.width * 2, y: Settings.info_box.y + Settings.pixel.height * 6});
+        Graphics.writeText("Time: " + timer.getTime(), {x: Settings.info_box.x + Settings.pixel.width * 30, y: Settings.info_box.y + Settings.pixel.height * 6});
+        Graphics.writeText("Score: " + board.getScore(), {x: Settings.info_box.x + Settings.pixel.width * 2, y: Settings.info_box.y + Settings.pixel.height * 14});
+        Graphics.writeText("Rows Cleared: " + board.getRowsCleared(), {x: Settings.info_box.x + Settings.pixel.width * 2, y: Settings.info_box.y + Settings.pixel.height * 22});
+
+        nextBlockRenderer.render(board.getNextBlocks());
         board_renderer.render(board);
         Particles.render();
     }
@@ -108,16 +128,17 @@ namespace Game {
     }
 
     function gameOver(){
+        nextFrame = false;
         Score.saveScore();
         (<HTMLDivElement>document.getElementById('score-final')).innerHTML = 'Your score was: ' + Score.getScore().toString();
         Screens.showSubScreen('sub-screen-gameover');
     }
 
-    Screens.addScreen({id: 'screen-game', init: () => init(), run: () => run()});
-    (<HTMLDivElement>document.getElementById('button-start')).addEventListener('click', () => Screens.showScreen('screen-game'));
+    Screens.addScreen({id: 'screen-game', init: () => init(), run: (params) => run(params)});
+    //(<HTMLDivElement>document.getElementById('button-start')).addEventListener('click', () => Screens.showScreen('screen-game'));
 
     Screens.addScreen({id: 'sub-screen-pause'});
-    (<HTMLDivElement>document.getElementById('button-resume')).addEventListener('click', () => Screens.showScreen('screen-game'));
+    (<HTMLDivElement>document.getElementById('button-resume')).addEventListener('click', () => Screens.showScreen('screen-game', {char: character}));
     (<HTMLDivElement>document.getElementById('button-quit')).addEventListener('click', () => quit());
 
     Screens.addScreen({id: 'sub-screen-gameover'});

@@ -2,6 +2,7 @@
 
 import BlockRenderer from "./block_renderer";
 import Board from "../objects/board";
+import settings from "../settings";
 
 export default class BoardRenderer {
     private block_renderer = new BlockRenderer();

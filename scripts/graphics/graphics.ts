@@ -178,4 +178,11 @@ namespace Graphics {
         context.stroke
         context.restore();
     }
+
+    export function writeText(text: string, location: {x: number, y: number}, font: string = "24px Arial"){
+        context.font = font;
+        context.strokeStyle = "white"
+        context.fillText(text, location.x, location.y);
+        context.strokeText(text, location.x, location.y);
+    }
 }

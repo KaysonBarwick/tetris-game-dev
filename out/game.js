@@ -156,6 +156,14 @@ var Graphics;
         context.restore();
     }
     Graphics.drawCircle = drawCircle;
+    function writeText(text, location, font) {
+        if (font === void 0) { font = "24px Arial"; }
+        context.font = font;
+        context.strokeStyle = "white";
+        context.fillText(text, location.x, location.y);
+        context.strokeText(text, location.x, location.y);
+    }
+    Graphics.writeText = writeText;
 })(Graphics || (Graphics = {}));
 var Screens;
 (function (Screens) {
@@ -167,7 +175,7 @@ var Screens;
         }
     }
     Screens.showSubScreen = showSubScreen;
-    function showScreen(id) {
+    function showScreen(id, param) {
         for (var screen_1 in screens) {
             var div = document.getElementById(screens[screen_1].id);
             div.classList.remove('sub-active');
@@ -177,7 +185,7 @@ var Screens;
         if (screen) {
             document.getElementById(id).classList.add('active');
             if (screen.run) {
-                screen.run();
+                screen.run(param);
             }
         }
     }
@@ -192,6 +200,14 @@ var Screens;
         }
     }
     Screens.addScreen = addScreen;
+    Screens.addScreen({ id: 'screen-characters', init: function () { }, run: function () { } });
+    document.getElementById('button-characters').addEventListener('click', function () { return Screens.showScreen('screen-characters'); });
+    document.getElementById('button-yoshi').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: 'yoshi', init: true }); });
+    document.getElementById('button-raven').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: 'raven', init: true }); });
+    document.getElementById('button-poochy').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: 'poochy', init: true }); });
+    document.getElementById('button-blargg').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: 'blargg', init: true }); });
+    document.getElementById('button-froggy').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: 'froggy', init: true }); });
+    document.getElementById('button-lakitu').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: 'lakitu', init: true }); });
     Screens.addScreen({ id: 'screen-options', init: function () { }, run: function () { } });
     document.getElementById('button-options').addEventListener('click', function () { return Screens.showScreen('screen-options'); });
     document.getElementById('button-back-options').addEventListener('click', function () { return Screens.showScreen('screen-main-menu'); });
@@ -209,12 +225,16 @@ define("settings", ["require", "exports"], function (require, exports) {
     var pixel = { width: canvas.width / bg.width, height: canvas.height / bg.height };
     var board_size = { height: 192 * pixel.height, width: 96 * pixel.width };
     var settings = {
+        pixel: pixel,
         board: { height: 20, width: 10 },
         board_offset: { x: 88 * pixel.width, y: 23 * pixel.height },
+        info_box: { x: 16 * pixel.width, y: 23 * pixel.height },
+        next_box: { x: 192 * pixel.width, y: 31 * pixel.height },
         next_block_count: 4,
         block_respawn_delay: 500,
         fall_rate: 500,
         fall_rate_per_level: 50,
+        rows_per_level: 10,
         fast_drop_rate: 7,
         block_size: { width: 0, height: 0 }
     };
@@ -352,6 +372,9 @@ define("utils/timer", ["require", "exports"], function (require, exports) {
             }
             this.timeLabel.innerHTML = '0';
         }
+        Timer.prototype.getTime = function () {
+            return this.time;
+        };
         Timer.prototype.updateTime = function (elapsedTime) {
             this.passed_time += elapsedTime;
             if (this.passed_time >= 1000) {
@@ -497,68 +520,6 @@ define("graphics/particle-system", ["require", "exports"], function (require, ex
     }());
     exports["default"] = ParticalSystem;
 });
-define("graphics/particles", ["require", "exports", "graphics/particle-system"], function (require, exports, particle_system_1) {
-    "use strict";
-    exports.__esModule = true;
-    var Particles = /** @class */ (function () {
-        function Particles() {
-            this.systems = [];
-        }
-        Particles.prototype.addExplosion = function (center) {
-            this.systems.push(new particle_system_1["default"]({
-                size: { mean: 30, stdev: 10 },
-                center: __assign({}, center),
-                speed: { mean: 100, stdev: 30 },
-                lifetime: { mean: 0.5, stdev: 0.2 },
-                angle: { min: 0, max: 2 * Math.PI },
-                src: './assets/fire.png',
-                spawn_rate: 100,
-                duration: 0.3
-            }));
-        };
-        Particles.prototype.addThrust = function (center, angle) {
-            angle += Math.PI;
-            this.systems.push(new particle_system_1["default"]({
-                size: { mean: 30, stdev: 10 },
-                center: __assign({}, center),
-                speed: { mean: 300, stdev: 100 },
-                lifetime: { mean: 0.5, stdev: 0.1 },
-                angle: { min: angle + Math.PI / 16, max: angle - Math.PI / 16 },
-                src: './assets/fire.png',
-                spawn_rate: 10,
-                duration: 0.2 // seconds
-            }));
-        };
-        Particles.prototype.addHyper = function () {
-            this.systems.push(new particle_system_1["default"]({
-                size: { mean: 30, stdev: 10 },
-                center: { x: Graphics.canvas.width / 2, y: Graphics.canvas.height / 2 },
-                speed: { mean: 100, stdev: 30 },
-                lifetime: { mean: 1000, stdev: 500 },
-                angle: { min: 0, max: 2 * Math.PI },
-                src: './assets/fire.png',
-                spawn_rate: 1 / 10,
-                duration: 10 // seconds
-            }));
-        };
-        Particles.prototype.update = function (elapsed_time) {
-            var _this = this;
-            this.systems.forEach(function (system, index) {
-                var living = system.update(elapsed_time);
-                if (!living) {
-                    _this.systems.splice(index, 1);
-                }
-            });
-        };
-        Particles.prototype.render = function () {
-            this.systems.forEach(function (system) { return system.render(); });
-        };
-        return Particles;
-    }());
-    exports.Particles = Particles;
-    var particles = new Particles();
-    exports["default"] = particles;
-});
 define("objects/object", ["require", "exports"], function (require, exports) {
     "use strict";
     exports.__esModule = true;
@@ -593,10 +554,11 @@ define("objects/block", ["require", "exports", "settings", "objects/object"], fu
     })(BlockTypes = exports.BlockTypes || (exports.BlockTypes = {}));
     var Block = /** @class */ (function (_super) {
         __extends(Block, _super);
-        function Block(type, index) {
+        function Block(type, index, group_id) {
             var _this = _super.call(this) || this;
             _this.type = type;
             _this.index = index;
+            _this.group_id = group_id;
             _this.active = true;
             return _this;
         }
@@ -609,13 +571,18 @@ define("objects/block", ["require", "exports", "settings", "objects/object"], fu
             return { height: settings_1["default"].block_size.height, width: settings_1["default"].block_size.width };
         };
         Block.prototype.fall = function () {
-            this.index.y++;
+            if (this.index.y < settings_1["default"].board.height + 2) {
+                this.index.y++;
+            }
         };
         Block.prototype.moveRight = function () {
             this.index.x++;
         };
         Block.prototype.moveLeft = function () {
             this.index.x--;
+        };
+        Block.prototype.getGroupID = function () {
+            return this.group_id;
         };
         Block.prototype.rotateRight = function (topLeft) {
             var x = this.index.x - topLeft.x;
@@ -711,11 +678,110 @@ define("objects/block", ["require", "exports", "settings", "objects/object"], fu
             this.active = value;
         };
         Block.prototype.duplicate = function () {
-            return new Block(this.type, __assign({}, this.index));
+            return new Block(this.type, __assign({}, this.index), this.group_id);
         };
         return Block;
     }(object_1["default"]));
     exports["default"] = Block;
+});
+define("graphics/particles", ["require", "exports", "graphics/particle-system", "settings"], function (require, exports, particle_system_1, settings_2) {
+    "use strict";
+    exports.__esModule = true;
+    var Particles = /** @class */ (function () {
+        function Particles() {
+            this.systems = [];
+        }
+        Particles.prototype.addBlockPlace = function (blocks) {
+            var _this = this;
+            blocks.forEach(function (block) {
+                //left
+                _this.systems.push(new particle_system_1["default"]({
+                    size: { mean: settings_2["default"].block_size.height / 20, stdev: settings_2["default"].block_size.height / 25 },
+                    center: { x: block.getCenter().x - settings_2["default"].block_size.width / 2, y: block.getCenter().y },
+                    speed: { mean: 10, stdev: 5 },
+                    lifetime: { mean: 0.5, stdev: 0.2 },
+                    angle: { min: Math.PI / 2, max: 3 * Math.PI / 2 },
+                    src: './assets/particle.png',
+                    spawn_rate: 10,
+                    duration: 0.3
+                }));
+                //right
+                _this.systems.push(new particle_system_1["default"]({
+                    size: { mean: settings_2["default"].block_size.height / 20, stdev: settings_2["default"].block_size.height / 25 },
+                    center: { x: block.getCenter().x + settings_2["default"].block_size.width / 2, y: block.getCenter().y },
+                    speed: { mean: 10, stdev: 5 },
+                    lifetime: { mean: 0.5, stdev: 0.2 },
+                    angle: { min: -Math.PI / 2, max: Math.PI / 2 },
+                    src: './assets/particle.png',
+                    spawn_rate: 10,
+                    duration: 0.3
+                }));
+                //top
+                _this.systems.push(new particle_system_1["default"]({
+                    size: { mean: settings_2["default"].block_size.height / 20, stdev: settings_2["default"].block_size.height / 25 },
+                    center: { x: block.getCenter().x, y: block.getCenter().y - settings_2["default"].block_size.height / 2 },
+                    speed: { mean: 10, stdev: 5 },
+                    lifetime: { mean: 0.5, stdev: 0.2 },
+                    angle: { min: 0, max: 3 * Math.PI },
+                    src: './assets/particle.png',
+                    spawn_rate: 10,
+                    duration: 0.3
+                }));
+                //bottom
+                _this.systems.push(new particle_system_1["default"]({
+                    size: { mean: settings_2["default"].block_size.height / 20, stdev: settings_2["default"].block_size.height / 25 },
+                    center: { x: block.getCenter().x, y: block.getCenter().y + settings_2["default"].block_size.width / 2 },
+                    speed: { mean: 10, stdev: 5 },
+                    lifetime: { mean: 0.5, stdev: 0.2 },
+                    angle: { min: Math.PI, max: 2 * Math.PI },
+                    src: './assets/particle.png',
+                    spawn_rate: 10,
+                    duration: 0.3
+                }));
+            });
+        };
+        Particles.prototype.addThrust = function (center, angle) {
+            angle += Math.PI;
+            this.systems.push(new particle_system_1["default"]({
+                size: { mean: 30, stdev: 10 },
+                center: __assign({}, center),
+                speed: { mean: 300, stdev: 100 },
+                lifetime: { mean: 0.5, stdev: 0.1 },
+                angle: { min: angle + Math.PI / 16, max: angle - Math.PI / 16 },
+                src: './assets/fire.png',
+                spawn_rate: 10,
+                duration: 0.2 // seconds
+            }));
+        };
+        Particles.prototype.addHyper = function () {
+            this.systems.push(new particle_system_1["default"]({
+                size: { mean: 30, stdev: 10 },
+                center: { x: Graphics.canvas.width / 2, y: Graphics.canvas.height / 2 },
+                speed: { mean: 100, stdev: 30 },
+                lifetime: { mean: 1000, stdev: 500 },
+                angle: { min: 0, max: 2 * Math.PI },
+                src: './assets/fire.png',
+                spawn_rate: 1 / 10,
+                duration: 10 // seconds
+            }));
+        };
+        Particles.prototype.update = function (elapsed_time) {
+            var _this = this;
+            this.systems.forEach(function (system, index) {
+                var living = system.update(elapsed_time);
+                if (!living) {
+                    _this.systems.splice(index, 1);
+                }
+            });
+        };
+        Particles.prototype.render = function () {
+            this.systems.forEach(function (system) { return system.render(); });
+        };
+        return Particles;
+    }());
+    exports.Particles = Particles;
+    var particles = new Particles();
+    exports["default"] = particles;
 });
 define("graphics/animated-model", ["require", "exports"], function (require, exports) {
     "use strict";
@@ -807,33 +873,34 @@ define("render/block_animator", ["require", "exports", "graphics/animated-model"
     exports["default"] = BlockAnimator;
 });
 /// <reference path="../utils/random.ts" />
-define("objects/board", ["require", "exports", "objects/block", "settings", "render/block_animator"], function (require, exports, block_1, settings_2, block_animator_1) {
+define("objects/board", ["require", "exports", "objects/block", "settings", "render/block_animator", "graphics/particles"], function (require, exports, block_1, settings_3, block_animator_1, particles_1) {
     "use strict";
     exports.__esModule = true;
     var Board = /** @class */ (function () {
         function Board(level) {
-            if (level === void 0) { level = 1; }
+            if (level === void 0) { level = 0; }
             this.level = level;
             this.board = [];
             this.nextBlocks = [];
             this.toFall = [];
+            this.next_group_id = 1;
             this.activeBlocks = [];
             this.activeRotate = 0; // 0 = rotate 0, 1 = rotate 90, 2 = rotate 180, 3 = rotate -90
             this.fallCarryOver = 0;
             this.blockDelayCarryOver = 0;
             this.blockAnimator = new block_animator_1["default"]();
+            this.cleared = 0;
+            this.score = 0;
             // board[0] and board[1] will be off screen and used to detect loss and
             // make the blocks appear to fall onto the screen.
-            for (var i = 0; i <= settings_2["default"].board.height + 1; i++) {
+            for (var i = 0; i <= settings_3["default"].board.height + 1; i++) {
                 var row = [];
-                for (var j = 0; j < settings_2["default"].board.width; j++) {
+                for (var j = 0; j < settings_3["default"].board.width; j++) {
                     row.push(null);
                 }
                 this.board.push(row);
             }
-            for (var i = 0; i < settings_2["default"].next_block_count; ++i) {
-                this.nextBlocks.push(Random.randomInt(0, 6));
-            }
+            this.activeBlocks = this.nextBlock();
         }
         //
         // ------------Getters------------
@@ -864,7 +931,7 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
                 shadowBlocks.forEach(function (block) {
                     var x = block.getIndex().x;
                     var y = block.getIndex().y;
-                    if (y > settings_2["default"].board.height || _this.board[y + 1][x] != null) {
+                    if (y > settings_3["default"].board.height || _this.board[y + 1][x] != null) {
                         active = false; // Hit bottom or block beneath
                     }
                 });
@@ -879,27 +946,92 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
         Board.prototype.getBlockAnimator = function () {
             return this.blockAnimator;
         };
+        Board.prototype.getLevel = function () {
+            return this.level;
+        };
+        Board.prototype.getScore = function () {
+            return this.score;
+        };
+        Board.prototype.getRowsCleared = function () {
+            return this.cleared;
+        };
+        Board.prototype.isGameOver = function () {
+            var gameOver = false;
+            this.board[0].forEach(function (block) {
+                if (block) {
+                    gameOver = true;
+                    return;
+                }
+            });
+            return gameOver;
+        };
         //
         // ------------Game actions------------
         Board.prototype.update = function (elapsed_time) {
             var _this = this;
+            this.level = Math.floor(this.cleared / settings_3["default"].rows_per_level);
             this.blockAnimator.update(elapsed_time);
             if (this.blockAnimator.isPopping()) {
+                this.popRow();
                 return;
             }
             else {
+                var groups_1 = {};
                 this.toFall.forEach(function (block) {
+                    // Remove fall blocks from board and find groups
                     var x = block.getIndex().x;
                     var y = block.getIndex().y;
-                    _this.board[y + 1][x] = block;
                     _this.board[y][x] = null;
-                    block.fall();
+                    var id = block.getGroupID();
+                    if (groups_1.hasOwnProperty(id)) {
+                        groups_1[id].push(block);
+                    }
+                    else {
+                        groups_1[id] = [block];
+                    }
                 });
+                while (this.toFall.length > 0) {
+                    this.toFall.forEach(function (block) {
+                        block.fall();
+                    });
+                    var locking = true;
+                    while (locking) {
+                        locking = false;
+                        var _loop_1 = function (id) {
+                            if (groups_1.hasOwnProperty(id)) {
+                                // Check if group hit bottom
+                                var active_1 = true;
+                                groups_1[id].forEach(function (block) {
+                                    var x = block.getIndex().x;
+                                    var y = block.getIndex().y;
+                                    if (y >= _this.board.length - 1 || _this.board[y + 1][x] != null) {
+                                        active_1 = false; // Hit bottom or block beneath
+                                    }
+                                });
+                                if (!active_1) {
+                                    // Group hit bottom
+                                    locking = true;
+                                    // Add to board
+                                    groups_1[id].forEach(function (block) {
+                                        _this.board[block.getIndex().y][block.getIndex().x] = block;
+                                        _this.toFall.splice(_this.toFall.indexOf(block), 1);
+                                    });
+                                    particles_1["default"].addBlockPlace(groups_1[id]);
+                                    // Remove from falling and groups
+                                    delete groups_1[id];
+                                }
+                            }
+                        };
+                        for (var id in groups_1) {
+                            _loop_1(id);
+                        }
+                    }
+                }
                 this.toFall = [];
             }
             if (this.isActive()) {
                 this.fallCarryOver += elapsed_time;
-                var fall_rate = settings_2["default"].fall_rate - settings_2["default"].fall_rate_per_level * this.level;
+                var fall_rate = settings_3["default"].fall_rate - settings_3["default"].fall_rate_per_level * this.level;
                 if (this.fallCarryOver >= fall_rate) {
                     this.fallCarryOver -= fall_rate;
                     this.fall();
@@ -908,13 +1040,14 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             else {
                 this.popRow();
                 this.blockDelayCarryOver += elapsed_time;
-                if (this.blockDelayCarryOver >= settings_2["default"].block_respawn_delay) {
-                    this.blockDelayCarryOver -= settings_2["default"].block_respawn_delay;
-                    this.addBlock();
+                if (this.blockDelayCarryOver >= settings_3["default"].block_respawn_delay) {
+                    this.blockDelayCarryOver -= settings_3["default"].block_respawn_delay;
+                    this.activeBlocks = this.nextBlock();
                 }
             }
         };
         Board.prototype.popRow = function () {
+            var popped = 0;
             for (var i = 0; i < this.board.length; ++i) {
                 var shouldPop = true;
                 for (var j = 0; j < this.board[i].length; j++) {
@@ -924,6 +1057,8 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
                     }
                 }
                 if (shouldPop) {
+                    popped++;
+                    this.cleared++;
                     for (var j = 0; j < this.board[i].length; j++) {
                         this.blockAnimator.popBlock(this.board[i][j]);
                         this.board[i][j] = null;
@@ -937,60 +1072,75 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
                     }
                 }
             }
+            if (popped == 1) {
+                this.score += 40 * (this.level + 1);
+            }
+            if (popped == 2) {
+                this.score += 100 * (this.level + 1);
+            }
+            if (popped == 3) {
+                this.score += 300 * (this.level + 1);
+            }
+            if (popped == 4) {
+                this.score += 1200 * (this.level + 1);
+            }
         };
         Board.prototype.nextBlock = function () {
-            var next = this.nextBlocks.shift();
-            this.nextBlocks.push(Random.randomInt(0, 6));
-            return next;
-        };
-        Board.prototype.addBlock = function () {
-            var type = this.nextBlock();
-            var middle = Math.floor(settings_2["default"].board.width / 2);
-            this.activeRotate = 0;
-            this.topLeft = { x: middle - 1, y: 0 };
-            switch (type) {
-                case block_1.BlockTypes.L:
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.L, { x: middle - 1, y: 0 }));
-                    for (var i = middle - 1; i <= middle + 1; ++i) {
-                        this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.L, { x: i, y: 1 }));
-                    }
-                    break;
-                case block_1.BlockTypes.I:
-                    for (var i = middle - 1; i <= middle + 2; ++i) {
-                        this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.I, { x: i, y: 1 }));
-                    }
-                    break;
-                case block_1.BlockTypes.O:
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.O, { x: middle, y: 0 }));
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.O, { x: middle + 1, y: 0 }));
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.O, { x: middle, y: 1 }));
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.O, { x: middle + 1, y: 1 }));
-                    break;
-                case block_1.BlockTypes.T:
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.T, { x: middle, y: 0 }));
-                    for (var i = middle - 1; i <= middle + 1; ++i) {
-                        this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.T, { x: i, y: 1 }));
-                    }
-                    break;
-                case block_1.BlockTypes.S:
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.S, { x: middle, y: 0 }));
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.S, { x: middle + 1, y: 0 }));
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.S, { x: middle, y: 1 }));
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.S, { x: middle - 1, y: 1 }));
-                    break;
-                case block_1.BlockTypes.J:
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.J, { x: middle + 1, y: 0 }));
-                    for (var i = middle - 1; i <= middle + 1; ++i) {
-                        this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.J, { x: i, y: 1 }));
-                    }
-                    break;
-                case block_1.BlockTypes.Z:
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.Z, { x: middle, y: 0 }));
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.Z, { x: middle - 1, y: 0 }));
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.Z, { x: middle, y: 1 }));
-                    this.activeBlocks.push(new block_1["default"](block_1.BlockTypes.Z, { x: middle + 1, y: 1 }));
-                    break;
+            // Add a blocks to next
+            while (this.nextBlocks.length <= settings_3["default"].next_block_count) {
+                var type = Random.randomInt(0, 6);
+                var middle = Math.floor(settings_3["default"].board.width / 2);
+                this.activeRotate = 0;
+                this.topLeft = { x: middle - 1, y: 0 };
+                var blocks = [];
+                switch (type) {
+                    case block_1.BlockTypes.L:
+                        blocks.push(new block_1["default"](block_1.BlockTypes.L, { x: middle - 1, y: 0 }, this.next_group_id));
+                        for (var i = middle - 1; i <= middle + 1; ++i) {
+                            blocks.push(new block_1["default"](block_1.BlockTypes.L, { x: i, y: 1 }, this.next_group_id));
+                        }
+                        break;
+                    case block_1.BlockTypes.I:
+                        for (var i = middle - 1; i <= middle + 2; ++i) {
+                            blocks.push(new block_1["default"](block_1.BlockTypes.I, { x: i, y: 1 }, this.next_group_id));
+                        }
+                        break;
+                    case block_1.BlockTypes.O:
+                        blocks.push(new block_1["default"](block_1.BlockTypes.O, { x: middle, y: 0 }, this.next_group_id));
+                        blocks.push(new block_1["default"](block_1.BlockTypes.O, { x: middle + 1, y: 0 }, this.next_group_id));
+                        blocks.push(new block_1["default"](block_1.BlockTypes.O, { x: middle, y: 1 }, this.next_group_id));
+                        blocks.push(new block_1["default"](block_1.BlockTypes.O, { x: middle + 1, y: 1 }, this.next_group_id));
+                        break;
+                    case block_1.BlockTypes.T:
+                        blocks.push(new block_1["default"](block_1.BlockTypes.T, { x: middle, y: 0 }, this.next_group_id));
+                        for (var i = middle - 1; i <= middle + 1; ++i) {
+                            blocks.push(new block_1["default"](block_1.BlockTypes.T, { x: i, y: 1 }, this.next_group_id));
+                        }
+                        break;
+                    case block_1.BlockTypes.S:
+                        blocks.push(new block_1["default"](block_1.BlockTypes.S, { x: middle, y: 0 }, this.next_group_id));
+                        blocks.push(new block_1["default"](block_1.BlockTypes.S, { x: middle + 1, y: 0 }, this.next_group_id));
+                        blocks.push(new block_1["default"](block_1.BlockTypes.S, { x: middle, y: 1 }, this.next_group_id));
+                        blocks.push(new block_1["default"](block_1.BlockTypes.S, { x: middle - 1, y: 1 }, this.next_group_id));
+                        break;
+                    case block_1.BlockTypes.J:
+                        blocks.push(new block_1["default"](block_1.BlockTypes.J, { x: middle + 1, y: 0 }, this.next_group_id));
+                        for (var i = middle - 1; i <= middle + 1; ++i) {
+                            blocks.push(new block_1["default"](block_1.BlockTypes.J, { x: i, y: 1 }, this.next_group_id));
+                        }
+                        break;
+                    case block_1.BlockTypes.Z:
+                        blocks.push(new block_1["default"](block_1.BlockTypes.Z, { x: middle, y: 0 }, this.next_group_id));
+                        blocks.push(new block_1["default"](block_1.BlockTypes.Z, { x: middle - 1, y: 0 }, this.next_group_id));
+                        blocks.push(new block_1["default"](block_1.BlockTypes.Z, { x: middle, y: 1 }, this.next_group_id));
+                        blocks.push(new block_1["default"](block_1.BlockTypes.Z, { x: middle + 1, y: 1 }, this.next_group_id));
+                        break;
+                }
+                this.nextBlocks.push(blocks);
+                this.next_group_id++;
             }
+            var next = this.nextBlocks.shift();
+            return next;
         };
         Board.prototype.fall = function () {
             var _this = this;
@@ -1002,7 +1152,7 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             this.activeBlocks.forEach(function (block) {
                 var x = block.getIndex().x;
                 var y = block.getIndex().y;
-                if (y > settings_2["default"].board.height || _this.board[y + 1][x] != null) {
+                if (y >= _this.board.length - 1 || _this.board[y + 1][x] != null) {
                     active = false; // Hit bottom or block beneath
                 }
             });
@@ -1016,8 +1166,10 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             else {
                 // Deactivate blocks by moving them to board
                 this.activeBlocks.forEach(function (block) {
+                    console.log(_this, block);
                     _this.board[block.getIndex().y][block.getIndex().x] = block;
                 });
+                particles_1["default"].addBlockPlace(this.activeBlocks);
                 this.activeBlocks = [];
             }
         };
@@ -1052,7 +1204,7 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             this.activeBlocks.forEach(function (block) {
                 var x = block.getIndex().x;
                 var y = block.getIndex().y;
-                if (x >= settings_2["default"].board.width - 1 || _this.board[y][x + 1] != null) {
+                if (x >= settings_3["default"].board.width - 1 || _this.board[y][x + 1] != null) {
                     canMove = false;
                 }
             });
@@ -1106,14 +1258,14 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             else if (type == block_1.BlockTypes.O) {
                 success = true; // Don't need to rotate O blocks
             }
-            var _loop_1 = function (kick) {
+            var _loop_2 = function (kick) {
                 var canMove = true;
                 for (var _i = 0, _a = this_1.activeBlocks; _i < _a.length; _i++) {
                     var block = _a[_i];
                     var x = block.getIndex().x + kick.x;
                     var y = block.getIndex().y + kick.y;
-                    if (x < 0 || x >= settings_2["default"].board.width ||
-                        y > settings_2["default"].board.height ||
+                    if (x < 0 || x >= settings_3["default"].board.width ||
+                        y > settings_3["default"].board.height ||
                         this_1.board[y][x] != null) {
                         canMove = false;
                         break;
@@ -1132,7 +1284,7 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             var this_1 = this;
             for (var _i = 0, wallKick_1 = wallKick; _i < wallKick_1.length; _i++) {
                 var kick = wallKick_1[_i];
-                var state_1 = _loop_1(kick);
+                var state_1 = _loop_2(kick);
                 if (state_1 === "break")
                     break;
             }
@@ -1187,14 +1339,14 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             else if (type == block_1.BlockTypes.O) {
                 success = true; // Don't need to rotate O blocks
             }
-            var _loop_2 = function (kick) {
+            var _loop_3 = function (kick) {
                 var canMove = true;
                 for (var _i = 0, _a = this_2.activeBlocks; _i < _a.length; _i++) {
                     var block = _a[_i];
                     var x = block.getIndex().x + kick.x;
                     var y = block.getIndex().y + kick.y;
-                    if (x < 0 || x >= settings_2["default"].board.width ||
-                        y > settings_2["default"].board.height ||
+                    if (x < 0 || x >= settings_3["default"].board.width ||
+                        y > settings_3["default"].board.height ||
                         this_2.board[y][x] != null) {
                         canMove = false;
                         break;
@@ -1213,7 +1365,7 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             var this_2 = this;
             for (var _i = 0, wallKick_2 = wallKick; _i < wallKick_2.length; _i++) {
                 var kick = wallKick_2[_i];
-                var state_2 = _loop_2(kick);
+                var state_2 = _loop_3(kick);
                 if (state_2 === "break")
                     break;
             }
@@ -1226,7 +1378,7 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             }
         };
         Board.prototype.fastDrop = function (elapsed_time) {
-            this.fallCarryOver += settings_2["default"].fast_drop_rate * elapsed_time;
+            this.fallCarryOver += settings_3["default"].fast_drop_rate * elapsed_time;
         };
         Board.prototype.hardDrop = function () {
             while (this.isActive()) {
@@ -1324,19 +1476,46 @@ define("render/board_renderer", ["require", "exports", "render/block_renderer"],
     }());
     exports["default"] = BoardRenderer;
 });
+define("render/next_block_renderer", ["require", "exports", "settings", "graphics/sprite-sheet"], function (require, exports, settings_4, sprite_sheet_2) {
+    "use strict";
+    exports.__esModule = true;
+    var NextBlockRenderer = /** @class */ (function () {
+        function NextBlockRenderer() {
+            this.sprites = new sprite_sheet_2["default"]('./assets/blocks.png', 7);
+        }
+        NextBlockRenderer.prototype.render = function (blocks) {
+            var _this = this;
+            blocks.forEach(function (group, index) {
+                group.forEach(function (block) {
+                    var size = block.getSize();
+                    var x = settings_4["default"].next_box.x + (block.getIndex().x - Math.floor(settings_4["default"].board.width / 2) + 2) * size.width;
+                    var y = settings_4["default"].next_box.y + (block.getIndex().y + index * 2.5) * size.height + size.height;
+                    _this.sprites.render({
+                        center: { x: x, y: y },
+                        size: block.getSize()
+                    }, block.getType());
+                });
+            });
+        };
+        return NextBlockRenderer;
+    }());
+    exports["default"] = NextBlockRenderer;
+});
 /// <reference path="./graphics/graphics.ts" />
 /// <reference path="./utils/screens.ts" />
-define("game", ["require", "exports", "utils/input", "utils/scores", "utils/timer", "graphics/particles", "objects/board", "render/board_renderer"], function (require, exports, input_1, scores_1, timer_1, particles_1, board_1, board_renderer_1) {
+define("game", ["require", "exports", "settings", "utils/input", "utils/scores", "utils/timer", "graphics/particles", "objects/board", "render/board_renderer", "render/next_block_renderer", "utils/scores"], function (require, exports, settings_5, input_1, scores_1, timer_1, particles_2, board_1, board_renderer_1, next_block_renderer_1, scores_2) {
     "use strict";
     exports.__esModule = true;
     var Game;
     (function (Game) {
+        var character;
         var prevTime;
         var nextFrame = false;
         var elapsedTime = 0;
         var input = new input_1["default"]();
         var timer = new timer_1["default"]('div-timer');
         var board_renderer = new board_renderer_1["default"]();
+        var nextBlockRenderer = new next_block_renderer_1["default"]();
         var board = new board_1["default"]();
         input.register_press('ArrowUp', function () { return board.hardDrop(); });
         input.register_hold('ArrowDown', function () { return board.fastDrop(elapsedTime); });
@@ -1351,23 +1530,23 @@ define("game", ["require", "exports", "utils/input", "utils/scores", "utils/time
         input.register_press('e', function () { return board.rotateRight(); });
         input.register_press('Escape', function () { return pause(); });
         var backgroundImage;
-        function init(bg) {
-            if (bg === void 0) { bg = 'raven.png'; }
+        function init() {
             scores_1["default"].resetScore();
             timer.resetTime();
             board = new board_1["default"]();
-            // let canvas = document.getElementById('canvas-game')
-            // canvas.style.backgroundImage = "url('assets/player_backgrounds/" + bg + "')";
-            // canvas.style.backgroundSize = "100% 100%";
+        }
+        function run(params) {
+            if (params === void 0) { params = { char: 'yoshi', init: false }; }
+            character = params.char;
             backgroundImage = new Graphics.Texture({
-                src: 'assets/player_backgrounds/' + bg,
+                src: 'assets/player_backgrounds/' + character + '.png',
                 center: { x: Graphics.canvas.width / 2, y: Graphics.canvas.height / 2 },
                 size: { height: Graphics.canvas.height, width: Graphics.canvas.width }
             });
-            console.log(Graphics.canvas.width, Graphics.canvas.height);
-        }
-        function run() {
             // (<HTMLAudioElement>document.getElementById('myMusic')).play();
+            if (params.init) {
+                init();
+            }
             nextFrame = true;
             prevTime = performance.now();
             requestAnimationFrame(gameLoop);
@@ -1386,14 +1565,24 @@ define("game", ["require", "exports", "utils/input", "utils/scores", "utils/time
         function update(elapsedTime) {
             // Update Objects
             board.update(elapsedTime);
-            particles_1["default"].update(elapsedTime);
+            particles_2["default"].update(elapsedTime);
             timer.updateTime(elapsedTime);
+            if (board.isGameOver()) {
+                console.log('gameOver');
+                scores_2["default"].addScore(board.getScore());
+                gameOver();
+            }
         }
         function render() {
             Graphics.clear();
             backgroundImage.draw();
+            Graphics.writeText("Level: " + board.getLevel(), { x: settings_5["default"].info_box.x + settings_5["default"].pixel.width * 2, y: settings_5["default"].info_box.y + settings_5["default"].pixel.height * 6 });
+            Graphics.writeText("Time: " + timer.getTime(), { x: settings_5["default"].info_box.x + settings_5["default"].pixel.width * 30, y: settings_5["default"].info_box.y + settings_5["default"].pixel.height * 6 });
+            Graphics.writeText("Score: " + board.getScore(), { x: settings_5["default"].info_box.x + settings_5["default"].pixel.width * 2, y: settings_5["default"].info_box.y + settings_5["default"].pixel.height * 14 });
+            Graphics.writeText("Rows Cleared: " + board.getRowsCleared(), { x: settings_5["default"].info_box.x + settings_5["default"].pixel.width * 2, y: settings_5["default"].info_box.y + settings_5["default"].pixel.height * 22 });
+            nextBlockRenderer.render(board.getNextBlocks());
             board_renderer.render(board);
-            particles_1["default"].render();
+            particles_2["default"].render();
         }
         function gameLoop(currTime) {
             elapsedTime = currTime - prevTime;
@@ -1406,14 +1595,15 @@ define("game", ["require", "exports", "utils/input", "utils/scores", "utils/time
             }
         }
         function gameOver() {
+            nextFrame = false;
             scores_1["default"].saveScore();
             document.getElementById('score-final').innerHTML = 'Your score was: ' + scores_1["default"].getScore().toString();
             Screens.showSubScreen('sub-screen-gameover');
         }
-        Screens.addScreen({ id: 'screen-game', init: function () { return init(); }, run: function () { return run(); } });
-        document.getElementById('button-start').addEventListener('click', function () { return Screens.showScreen('screen-game'); });
+        Screens.addScreen({ id: 'screen-game', init: function () { return init(); }, run: function (params) { return run(params); } });
+        //(<HTMLDivElement>document.getElementById('button-start')).addEventListener('click', () => Screens.showScreen('screen-game'));
         Screens.addScreen({ id: 'sub-screen-pause' });
-        document.getElementById('button-resume').addEventListener('click', function () { return Screens.showScreen('screen-game'); });
+        document.getElementById('button-resume').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: character }); });
         document.getElementById('button-quit').addEventListener('click', function () { return quit(); });
         Screens.addScreen({ id: 'sub-screen-gameover' });
         document.getElementById('button-replay').addEventListener('click', function () { init(); Screens.showScreen('screen-game'); });

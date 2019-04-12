@@ -11,6 +11,10 @@ export default class Timer {
         this.timeLabel.innerHTML = '0';
     }
 
+    getTime(): number {
+        return this.time;
+    }
+
     updateTime(elapsedTime: DOMHighResTimeStamp){
         this.passed_time += elapsedTime;
         if(this.passed_time >= 1000){

@@ -14,6 +14,8 @@ export default class BlockRenderer {
         else {
             this.sprites.setTransparency(1);
         }
+
+
         this.sprites.render({
             center: block.getCenter(),
             size: block.getSize()
