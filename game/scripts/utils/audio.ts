@@ -39,7 +39,6 @@ class MyAudio {
     }
     
     private playSound(sound: string){
-        console.log(sound)
         this.sounds[sound][this.nextSound[sound]].play();
         this.nextSound[sound]++;
         this.nextSound[sound] %= this.sounds[sound].length;

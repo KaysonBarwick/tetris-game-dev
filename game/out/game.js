@@ -231,15 +231,14 @@ define("settings", ["require", "exports"], function (require, exports) {
     var controls = JSON.parse(localStorage.getItem('tetris-controls'));
     if (controls == null) {
         controls = {
-            left: 'a',
-            right: 'd',
-            rotate_right: 'e',
-            rotate_left: 'q',
-            hard_drop: 'w',
-            fast_drop: 's',
+            left: 'ArrowLeft',
+            right: 'ArrowRight',
+            rotate_right: 'PageUp',
+            rotate_left: 'Home',
+            hard_drop: 'ArrowUp',
+            fast_drop: 'ArrowDown',
             pause: 'Escape'
         };
-        setControls(null, null);
     }
     function setControls(action, key) {
         controls[action] = key;
@@ -930,7 +929,6 @@ define("utils/audio", ["require", "exports"], function (require, exports) {
             }
         }
         MyAudio.prototype.playSound = function (sound) {
-            console.log(sound);
             this.sounds[sound][this.nextSound[sound]].play();
             this.nextSound[sound]++;
             this.nextSound[sound] %= this.sounds[sound].length;
