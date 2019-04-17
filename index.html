@@ -14,8 +14,10 @@
             <ul class="menu">
                 <li> <button id='button-characters'> Start game </button>       </li>
                 <li> <button id='button-highscores'> High Scores </button> </li>
-                <li> <button id='button-options'> Help </button>        </li>
+                <li> <button id='button-options'> Controls </button>        </li>
                 <li> <button id='button-credits'> Credits </button>        </li>
+                <li> <button id='button-demo'> Demo </button>        </li>
+                <li> <button id='button-demo-speed'> Demo Fast </button>        </li>
             </ul>    
         </div>
 
@@ -30,19 +32,35 @@
 
         <!-- ~~~~~~~ Options ~~~~~~~ -->
         <div id='screen-options' class='screen'>
-            <h1 class="title"> Help </h1>
-            <h1 class="title"> Arrow Keys to move </h1>
-            <h1 class="title"> 'z' to hyerspace </h1>
-            <h1 class="title"> spacebar to shoot </h1>
+            <h1 class="title"> Controls
             <ul class="menu">
+                <li> <div id='button-left' > Left  </div></li>
+                <li> <div id='button-right' > Right  </div></li>
+                <li> <div id='button-rotate-right'> Rotate Right </div></li>
+                <li> <div id='button-rotate-left'> Rotate Left </div></li>
+                <li> <div id='button-fast-drop'> Fast Drop </div></li>
+                <li> <div id='button-hard-drop'> Hard Drop </div></li>
+                <li> <div id='button-pause'> Pause </div></li>
+
                 <li> <button id='button-back-options'> Main Menu </button> </li>
             </ul>
+            </h1>
+        </div>
+
+        <!-- ~~~~~~~ Options - Set Control ~~~~~~~ -->
+        <div id='sub-screen-control' class='screen'>
+            <div class='sub-screen'>
+                <h1 class="title"> Press a button to set control </p>
+            </div>
         </div>
 
         <!-- ~~~~~~~ Credits ~~~~~~~ -->
         <div id='screen-credits' class='screen'>
             <h1 class="title"> Created by: Kayson Barwick </h1>
-            <h1 class="title"> For other credits see file ./assets/credits.txt </h1>
+            <h1 class="title"> Sound effects edited by: Jayden Barwick </h1>
+            <h1 class="title"> Game  </h1>
+            <div></div>
+            <h1 class="title"> Credits for assets:  </h1>
             <ul class="menu">
                 <li> <button id='button-back-credits'> Main Menu </button> </li>
             </ul>
@@ -50,22 +68,18 @@
 
         <!-- ~~~~~~~ Characters ~~~~~~~ -->
         <div id='screen-characters' class='screen'>
-            <h1 class="title"> Select Character </p>
+            <h1 class="title"> Select Character
             <ul class="menu">
-                <!-- <li> <button id='button-yoshi'> Yoshi </button>   </li>
-                <li> <button id='button-raven'> Raven </button>   </li>
-                <li> <button id='button-blargg'> Blargg </button> </li>
-                <li> <button id='button-lakitu'> Lakitu </button> </li>
-                <li> <button id='button-poochy'> Poochy </button> </li>
-                <li> <button id='button-froggy'> Froggy </button> </li> -->
-
                 <li> <div id='button-yoshi' ><img src='assets/player_select/yoshi.png'> Yoshi   </div></li>
                 <li> <div id='button-raven' ><img src='assets/player_select/raven.png'> Raven   </div></li>
                 <li> <div id='button-blargg'><img src='assets/player_select/blargg.png'> Blargg </div></li>
                 <li> <div id='button-lakitu'><img src='assets/player_select/lakitu.png'> Lakitu </div></li>
                 <li> <div id='button-poochy'><img src='assets/player_select/poochy.png'> Poochy </div></li>
                 <li> <div id='button-froggy'><img src='assets/player_select/froggy.png'> Froggy </div></li>
-            </ul>    
+
+                <li> <button id='button-back-characters'> Main Menu </button> </li>
+            </ul>
+            </h1>
         </div>
 
         <!-- ~~~~~~~ Game ~~~~~~~ -->
@@ -74,9 +88,6 @@
                 <div id='div-timer'></div>
                 <div id='div-level'></div>
                 <div id='div-score'></div>
-                <div id='div-hyper'>
-                    <div id='div-hyper-bar'></div>
-                </div>
             </div>
             <canvas id='canvas-game' height='920' width='1080'></canvas>
         </div>

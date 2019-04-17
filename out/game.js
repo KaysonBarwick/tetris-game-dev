@@ -172,12 +172,20 @@ var Screens;
         var screen = screens[id];
         if (screen) {
             document.getElementById(id).classList.add('sub-active');
+            if (screen.run) {
+                screen.run();
+            }
         }
     }
     Screens.showSubScreen = showSubScreen;
     function showScreen(id, param) {
         for (var screen_1 in screens) {
             var div = document.getElementById(screens[screen_1].id);
+            if (div.classList.contains('sub-active') || div.classList.contains('active')) {
+                if (screens[screen_1].leave) {
+                    screens[screen_1].leave();
+                }
+            }
             div.classList.remove('sub-active');
             div.classList.remove('active');
         }
@@ -208,14 +216,10 @@ var Screens;
     document.getElementById('button-blargg').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: 'blargg', init: true }); });
     document.getElementById('button-froggy').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: 'froggy', init: true }); });
     document.getElementById('button-lakitu').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: 'lakitu', init: true }); });
-    Screens.addScreen({ id: 'screen-options', init: function () { }, run: function () { } });
-    document.getElementById('button-options').addEventListener('click', function () { return Screens.showScreen('screen-options'); });
-    document.getElementById('button-back-options').addEventListener('click', function () { return Screens.showScreen('screen-main-menu'); });
+    document.getElementById('button-back-characters').addEventListener('click', function () { return Screens.showScreen('screen-main-menu'); });
     Screens.addScreen({ id: 'screen-credits', init: function () { }, run: function () { } });
     document.getElementById('button-credits').addEventListener('click', function () { return Screens.showScreen('screen-credits'); });
     document.getElementById('button-back-credits').addEventListener('click', function () { return Screens.showScreen('screen-main-menu'); });
-    Screens.addScreen({ id: 'screen-main-menu' });
-    Screens.showScreen('screen-main-menu');
 })(Screens || (Screens = {}));
 define("settings", ["require", "exports"], function (require, exports) {
     "use strict";
@@ -224,6 +228,23 @@ define("settings", ["require", "exports"], function (require, exports) {
     var bg = { height: 224, width: 256 };
     var pixel = { width: canvas.width / bg.width, height: canvas.height / bg.height };
     var board_size = { height: 192 * pixel.height, width: 96 * pixel.width };
+    var controls = JSON.parse(localStorage.getItem('tetris-controls'));
+    if (controls == null) {
+        controls = {
+            left: 'a',
+            right: 'd',
+            rotate_right: 'e',
+            rotate_left: 'q',
+            hard_drop: 'w',
+            fast_drop: 's',
+            pause: 'Escape'
+        };
+        setControls(null, null);
+    }
+    function setControls(action, key) {
+        controls[action] = key;
+        localStorage.setItem('tetris-controls', JSON.stringify(controls));
+    }
     var settings = {
         pixel: pixel,
         board: { height: 20, width: 10 },
@@ -233,10 +254,13 @@ define("settings", ["require", "exports"], function (require, exports) {
         next_block_count: 4,
         block_respawn_delay: 500,
         fall_rate: 500,
-        fall_rate_per_level: 50,
-        rows_per_level: 10,
+        fall_rate_per_level: 15,
+        max_level: 25,
+        rows_per_level: 5,
         fast_drop_rate: 7,
-        block_size: { width: 0, height: 0 }
+        block_size: { width: 0, height: 0 },
+        controls: controls,
+        setControls: setControls
     };
     settings.block_size.width = board_size.width / settings.board.width;
     settings.block_size.height = board_size.height / settings.board.height;
@@ -259,6 +283,14 @@ define("utils/input", ["require", "exports"], function (require, exports) {
         };
         Input.prototype.onKeyup = function (e) {
             delete this.my_keys[e.key];
+        };
+        Input.prototype.unRegisterKey = function (key) {
+            if (this.handlers[key]) {
+                delete this.handlers[key];
+            }
+            if (this.press_handlers[key]) {
+                delete this.press_handlers[key];
+            }
         };
         Input.prototype.register_hold = function (key, handler) {
             this.handlers[key] = handler;
@@ -571,7 +603,7 @@ define("objects/block", ["require", "exports", "settings", "objects/object"], fu
             return { height: settings_1["default"].block_size.height, width: settings_1["default"].block_size.width };
         };
         Block.prototype.fall = function () {
-            if (this.index.y < settings_1["default"].board.height + 2) {
+            if (this.index.y < settings_1["default"].board.height + 1) {
                 this.index.y++;
             }
         };
@@ -740,30 +772,54 @@ define("graphics/particles", ["require", "exports", "graphics/particle-system", 
                 }));
             });
         };
-        Particles.prototype.addThrust = function (center, angle) {
-            angle += Math.PI;
-            this.systems.push(new particle_system_1["default"]({
-                size: { mean: 30, stdev: 10 },
-                center: __assign({}, center),
-                speed: { mean: 300, stdev: 100 },
-                lifetime: { mean: 0.5, stdev: 0.1 },
-                angle: { min: angle + Math.PI / 16, max: angle - Math.PI / 16 },
-                src: './assets/fire.png',
-                spawn_rate: 10,
-                duration: 0.2 // seconds
-            }));
-        };
-        Particles.prototype.addHyper = function () {
-            this.systems.push(new particle_system_1["default"]({
-                size: { mean: 30, stdev: 10 },
-                center: { x: Graphics.canvas.width / 2, y: Graphics.canvas.height / 2 },
-                speed: { mean: 100, stdev: 30 },
-                lifetime: { mean: 1000, stdev: 500 },
-                angle: { min: 0, max: 2 * Math.PI },
-                src: './assets/fire.png',
-                spawn_rate: 1 / 10,
-                duration: 10 // seconds
-            }));
+        Particles.prototype.addBlockPop = function (blocks) {
+            var _this = this;
+            blocks.forEach(function (block) {
+                // top left
+                _this.systems.push(new particle_system_1["default"]({
+                    size: { mean: settings_2["default"].block_size.height / 20, stdev: settings_2["default"].block_size.height / 25 },
+                    center: { x: block.getCenter().x - settings_2["default"].block_size.width / 2, y: block.getCenter().y - settings_2["default"].block_size.height / 2 },
+                    speed: { mean: 10, stdev: 5 },
+                    lifetime: { mean: 0.5, stdev: 0.2 },
+                    angle: { min: Math.PI / 2, max: 3 * Math.PI / 2 },
+                    src: './assets/particle.png',
+                    spawn_rate: 100,
+                    duration: 0.3
+                }));
+                //top right
+                _this.systems.push(new particle_system_1["default"]({
+                    size: { mean: settings_2["default"].block_size.height / 20, stdev: settings_2["default"].block_size.height / 25 },
+                    center: { x: block.getCenter().x + settings_2["default"].block_size.width / 2, y: block.getCenter().y - settings_2["default"].block_size.height / 2 },
+                    speed: { mean: 10, stdev: 5 },
+                    lifetime: { mean: 0.5, stdev: 0.2 },
+                    angle: { min: -Math.PI / 2, max: Math.PI / 2 },
+                    src: './assets/particle.png',
+                    spawn_rate: 100,
+                    duration: 0.3
+                }));
+                //bottom left
+                _this.systems.push(new particle_system_1["default"]({
+                    size: { mean: settings_2["default"].block_size.height / 20, stdev: settings_2["default"].block_size.height / 25 },
+                    center: { x: block.getCenter().x - settings_2["default"].block_size.width / 2, y: block.getCenter().y + settings_2["default"].block_size.height / 2 },
+                    speed: { mean: 10, stdev: 5 },
+                    lifetime: { mean: 0.5, stdev: 0.2 },
+                    angle: { min: 0, max: 3 * Math.PI },
+                    src: './assets/particle.png',
+                    spawn_rate: 100,
+                    duration: 0.3
+                }));
+                //bottom right
+                _this.systems.push(new particle_system_1["default"]({
+                    size: { mean: settings_2["default"].block_size.height / 20, stdev: settings_2["default"].block_size.height / 25 },
+                    center: { x: block.getCenter().x + settings_2["default"].block_size.width / 2, y: block.getCenter().y + settings_2["default"].block_size.width / 2 },
+                    speed: { mean: 10, stdev: 5 },
+                    lifetime: { mean: 0.5, stdev: 0.2 },
+                    angle: { min: Math.PI, max: 2 * Math.PI },
+                    src: './assets/particle.png',
+                    spawn_rate: 100,
+                    duration: 0.3
+                }));
+            });
         };
         Particles.prototype.update = function (elapsed_time) {
             var _this = this;
@@ -804,6 +860,9 @@ define("graphics/animated-model", ["require", "exports"], function (require, exp
                 onload: function () { _this.image.spec.subTextureWidth = _this.image.getWidth() / _this.spriteCount; }
             });
         }
+        AnimatedModel.prototype.getObject = function () {
+            return this.object;
+        };
         AnimatedModel.prototype.isDone = function () {
             return this.count >= this.times;
         };
@@ -829,13 +888,83 @@ define("graphics/animated-model", ["require", "exports"], function (require, exp
     }());
     exports["default"] = AnimatedModel;
 });
-define("render/block_animator", ["require", "exports", "graphics/animated-model"], function (require, exports, animated_model_1) {
+define("utils/audio", ["require", "exports"], function (require, exports) {
+    "use strict";
+    exports.__esModule = true;
+    var MyAudio = /** @class */ (function () {
+        function MyAudio() {
+            this.sounds = {
+                'blockLand': 3,
+                'blockRotate': 5,
+                'blockMove': 7,
+                'pop1': 5,
+                'pop2': 5,
+                'pop3': 5,
+                'pop4': 5,
+                'pop5': 5,
+                'pop6': 5,
+                'pop7': 5,
+                'pop8': 5,
+                'pop9': 5,
+                'pop10': 5,
+                'fanfare0': 4,
+                'fanfare1': 3,
+                'fanfare2': 3,
+                'fanfare3': 3
+            };
+            this.nextSound = {};
+            this.pop = 0;
+            for (var sound in this.sounds) {
+                if (this.sounds.hasOwnProperty(sound)) {
+                    var n = this.sounds[sound];
+                    for (var i = 0; i < n; ++i) {
+                        if (Array.isArray(this.sounds[sound])) {
+                            this.sounds[sound].push(new Audio('./assets/music/' + sound + '.mp3'));
+                        }
+                        else {
+                            this.sounds[sound] = [new Audio('./assets/music/' + sound + '.mp3')];
+                            this.nextSound[sound] = 0;
+                        }
+                    }
+                }
+            }
+        }
+        MyAudio.prototype.playSound = function (sound) {
+            console.log(sound);
+            this.sounds[sound][this.nextSound[sound]].play();
+            this.nextSound[sound]++;
+            this.nextSound[sound] %= this.sounds[sound].length;
+        };
+        MyAudio.prototype.blockMove = function () {
+            this.playSound('blockMove');
+        };
+        MyAudio.prototype.blockRotate = function () {
+            this.playSound('blockRotate');
+        };
+        MyAudio.prototype.blockLand = function () {
+            this.playSound('blockLand');
+        };
+        MyAudio.prototype.fanfare = function (n) {
+            this.playSound('fanfare' + n.toString());
+        };
+        MyAudio.prototype.popped = function () {
+            this.playSound('pop' + (this.pop + 1));
+            this.pop++;
+            this.pop %= 10;
+        };
+        return MyAudio;
+    }());
+    var audio = new MyAudio();
+    exports["default"] = audio;
+});
+/// <reference path="../graphics/graphics.ts" />
+define("render/block_animator", ["require", "exports", "graphics/animated-model", "graphics/particles", "utils/audio", "settings"], function (require, exports, animated_model_1, particles_1, audio_1, settings_3) {
     "use strict";
     exports.__esModule = true;
     var BlockAnimator = /** @class */ (function () {
         function BlockAnimator() {
             this.pop_frames = 8;
-            this.time_per_frame = [200, 200, 200, 200, 200, 200, 200, 250];
+            this.time_per_frame = [200, 200, 200, 200, 200, 200, 200, 500];
             this.sprites = [
                 './assets/blocks/green_pop_animation.png',
                 './assets/blocks/purple_pop_animation.png',
@@ -848,7 +977,13 @@ define("render/block_animator", ["require", "exports", "graphics/animated-model"
             this.popBlocks = [];
         }
         BlockAnimator.prototype.popBlock = function (block) {
-            this.popBlocks.push(new animated_model_1["default"](block, this.sprites[block.getType()], this.pop_frames, this.time_per_frame, 1));
+            var time_frames = this.time_per_frame.slice();
+            time_frames[this.time_per_frame.length - 1] -= Math.abs(block.getIndex().x - settings_3["default"].board.width / 2) * 90; // pop twoards middle
+            if (block.getIndex().x > settings_3["default"].board.width / 2) {
+                time_frames[this.time_per_frame.length - 1] += 45; // stagger left and right
+            }
+            time_frames[this.time_per_frame.length - 1] += (block.getIndex().y % 4) * 50; // stagger rows
+            this.popBlocks.push(new animated_model_1["default"](block, this.sprites[block.getType()], this.pop_frames, time_frames, 1));
         };
         BlockAnimator.prototype.isPopping = function () {
             return this.popBlocks.length > 0;
@@ -858,8 +993,9 @@ define("render/block_animator", ["require", "exports", "graphics/animated-model"
             this.popBlocks.forEach(function (animator, index) {
                 animator.update(elapsed_time);
                 if (animator.isDone()) {
+                    particles_1["default"].addBlockPop([animator.getObject()]);
                     _this.popBlocks.splice(index, 1);
-                    // Add pop particals here
+                    audio_1["default"].popped();
                 }
             });
         };
@@ -873,7 +1009,7 @@ define("render/block_animator", ["require", "exports", "graphics/animated-model"
     exports["default"] = BlockAnimator;
 });
 /// <reference path="../utils/random.ts" />
-define("objects/board", ["require", "exports", "objects/block", "settings", "render/block_animator", "graphics/particles"], function (require, exports, block_1, settings_3, block_animator_1, particles_1) {
+define("objects/board", ["require", "exports", "objects/block", "settings", "render/block_animator", "graphics/particles", "utils/audio"], function (require, exports, block_1, settings_4, block_animator_1, particles_2, audio_2) {
     "use strict";
     exports.__esModule = true;
     var Board = /** @class */ (function () {
@@ -881,6 +1017,7 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             if (level === void 0) { level = 0; }
             this.level = level;
             this.board = [];
+            this.nextTypes = [];
             this.nextBlocks = [];
             this.toFall = [];
             this.next_group_id = 1;
@@ -893,9 +1030,9 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             this.score = 0;
             // board[0] and board[1] will be off screen and used to detect loss and
             // make the blocks appear to fall onto the screen.
-            for (var i = 0; i <= settings_3["default"].board.height + 1; i++) {
+            for (var i = 0; i <= settings_4["default"].board.height + 1; i++) {
                 var row = [];
-                for (var j = 0; j < settings_3["default"].board.width; j++) {
+                for (var j = 0; j < settings_4["default"].board.width; j++) {
                     row.push(null);
                 }
                 this.board.push(row);
@@ -906,6 +1043,14 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
         // ------------Getters------------
         Board.prototype.isActive = function () {
             return this.activeBlocks.length > 0;
+        };
+        Board.prototype.isCritical = function () {
+            for (var i = 0; i < this.board[6].length; ++i) {
+                if (this.board[6][i] != null) {
+                    return true;
+                }
+            }
+            return false;
         };
         Board.prototype.getBoard = function () {
             return this.board;
@@ -931,7 +1076,7 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
                 shadowBlocks.forEach(function (block) {
                     var x = block.getIndex().x;
                     var y = block.getIndex().y;
-                    if (y > settings_3["default"].board.height || _this.board[y + 1][x] != null) {
+                    if (y > settings_4["default"].board.height || _this.board[y + 1][x] != null) {
                         active = false; // Hit bottom or block beneath
                     }
                 });
@@ -965,11 +1110,14 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             });
             return gameOver;
         };
+        Board.prototype.isPopping = function () {
+            return this.blockAnimator.isPopping();
+        };
         //
         // ------------Game actions------------
         Board.prototype.update = function (elapsed_time) {
             var _this = this;
-            this.level = Math.floor(this.cleared / settings_3["default"].rows_per_level);
+            this.level = Math.min(settings_4["default"].max_level, Math.floor(this.cleared / settings_4["default"].rows_per_level));
             this.blockAnimator.update(elapsed_time);
             if (this.blockAnimator.isPopping()) {
                 this.popRow();
@@ -990,9 +1138,18 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
                         groups_1[id] = [block];
                     }
                 });
+                if (this.toFall.length > 0) {
+                    audio_2["default"].blockLand();
+                }
                 while (this.toFall.length > 0) {
                     this.toFall.forEach(function (block) {
-                        block.fall();
+                        if (block.getIndex().y + 1 < _this.board.length && _this.board[block.getIndex().y + 1][block.getIndex().x] == null) {
+                            block.fall();
+                        }
+                        else {
+                            _this.board[block.getIndex().y][block.getIndex().x] = block;
+                            _this.toFall.splice(_this.toFall.indexOf(block), 1);
+                        }
                     });
                     var locking = true;
                     while (locking) {
@@ -1016,7 +1173,7 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
                                         _this.board[block.getIndex().y][block.getIndex().x] = block;
                                         _this.toFall.splice(_this.toFall.indexOf(block), 1);
                                     });
-                                    particles_1["default"].addBlockPlace(groups_1[id]);
+                                    particles_2["default"].addBlockPlace(groups_1[id]);
                                     // Remove from falling and groups
                                     delete groups_1[id];
                                 }
@@ -1031,7 +1188,7 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             }
             if (this.isActive()) {
                 this.fallCarryOver += elapsed_time;
-                var fall_rate = settings_3["default"].fall_rate - settings_3["default"].fall_rate_per_level * this.level;
+                var fall_rate = settings_4["default"].fall_rate - settings_4["default"].fall_rate_per_level * this.level;
                 if (this.fallCarryOver >= fall_rate) {
                     this.fallCarryOver -= fall_rate;
                     this.fall();
@@ -1040,8 +1197,8 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             else {
                 this.popRow();
                 this.blockDelayCarryOver += elapsed_time;
-                if (this.blockDelayCarryOver >= settings_3["default"].block_respawn_delay) {
-                    this.blockDelayCarryOver -= settings_3["default"].block_respawn_delay;
+                if (this.blockDelayCarryOver >= settings_4["default"].block_respawn_delay) {
+                    this.blockDelayCarryOver -= settings_4["default"].block_respawn_delay;
                     this.activeBlocks = this.nextBlock();
                 }
             }
@@ -1073,23 +1230,41 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
                 }
             }
             if (popped == 1) {
+                //Audio.fanfare(0);
                 this.score += 40 * (this.level + 1);
             }
             if (popped == 2) {
+                audio_2["default"].fanfare(1);
                 this.score += 100 * (this.level + 1);
             }
             if (popped == 3) {
+                audio_2["default"].fanfare(2);
                 this.score += 300 * (this.level + 1);
             }
             if (popped == 4) {
+                audio_2["default"].fanfare(3);
                 this.score += 1200 * (this.level + 1);
             }
         };
+        Board.prototype.nextType = function () {
+            var _a;
+            if (this.nextTypes.length == 0) {
+                for (var i = 0; i < 7; ++i) {
+                    this.nextTypes.push(i);
+                }
+                //scramble
+                for (var i = this.nextTypes.length - 1; i > 0; i--) { //https://stackoverflow.com/questions/6274339/how-can-i-shuffle-an-array
+                    var j = Math.floor(Math.random() * (i + 1));
+                    _a = [this.nextTypes[j], this.nextTypes[i]], this.nextTypes[i] = _a[0], this.nextTypes[j] = _a[1];
+                }
+            }
+            return this.nextTypes.shift();
+        };
         Board.prototype.nextBlock = function () {
             // Add a blocks to next
-            while (this.nextBlocks.length <= settings_3["default"].next_block_count) {
-                var type = Random.randomInt(0, 6);
-                var middle = Math.floor(settings_3["default"].board.width / 2);
+            while (this.nextBlocks.length <= settings_4["default"].next_block_count) {
+                var type = this.nextType();
+                var middle = Math.floor(settings_4["default"].board.width / 2);
                 this.activeRotate = 0;
                 this.topLeft = { x: middle - 1, y: 0 };
                 var blocks = [];
@@ -1166,19 +1341,20 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             else {
                 // Deactivate blocks by moving them to board
                 this.activeBlocks.forEach(function (block) {
-                    console.log(_this, block);
                     _this.board[block.getIndex().y][block.getIndex().x] = block;
                 });
-                particles_1["default"].addBlockPlace(this.activeBlocks);
+                particles_2["default"].addBlockPlace(this.activeBlocks);
+                audio_2["default"].blockLand();
                 this.activeBlocks = [];
             }
         };
         //
         // ------------Player Actions------------
-        Board.prototype.moveLeft = function () {
+        Board.prototype.moveLeft = function (playSound) {
             var _this = this;
+            if (playSound === void 0) { playSound = true; }
             if (!this.isActive()) {
-                return;
+                return false;
             }
             var canMove = true;
             this.activeBlocks.forEach(function (block) {
@@ -1193,18 +1369,24 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
                     block.moveLeft();
                 });
                 this.topLeft.x--;
+                if (playSound) {
+                    audio_2["default"].blockMove();
+                }
+                return true;
             }
+            return false;
         };
-        Board.prototype.moveRight = function () {
+        Board.prototype.moveRight = function (playSound) {
             var _this = this;
+            if (playSound === void 0) { playSound = true; }
             if (!this.isActive()) {
-                return;
+                return false;
             }
             var canMove = true;
             this.activeBlocks.forEach(function (block) {
                 var x = block.getIndex().x;
                 var y = block.getIndex().y;
-                if (x >= settings_3["default"].board.width - 1 || _this.board[y][x + 1] != null) {
+                if (x >= settings_4["default"].board.width - 1 || _this.board[y][x + 1] != null) {
                     canMove = false;
                 }
             });
@@ -1213,12 +1395,21 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
                     block.moveRight();
                 });
                 this.topLeft.x++;
+                if (playSound) {
+                    audio_2["default"].blockMove();
+                }
+                return true;
             }
+            return false;
         };
-        Board.prototype.rotateRight = function () {
+        Board.prototype.rotateRight = function (playSound) {
             var _this = this;
+            if (playSound === void 0) { playSound = true; }
             if (!this.isActive()) {
                 return;
+            }
+            if (playSound) {
+                audio_2["default"].blockRotate();
             }
             var type = this.activeBlocks[0].getType();
             this.activeRotate = (((this.activeRotate + 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
@@ -1264,8 +1455,8 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
                     var block = _a[_i];
                     var x = block.getIndex().x + kick.x;
                     var y = block.getIndex().y + kick.y;
-                    if (x < 0 || x >= settings_3["default"].board.width ||
-                        y > settings_3["default"].board.height ||
+                    if (x < 0 || x >= settings_4["default"].board.width ||
+                        y >= this_1.board.length || y < 0 ||
                         this_1.board[y][x] != null) {
                         canMove = false;
                         break;
@@ -1296,13 +1487,17 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
                 this.activeRotate = (((this.activeRotate - 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
             }
         };
-        Board.prototype.rotateLeft = function () {
+        Board.prototype.rotateLeft = function (playSound) {
             var _this = this;
+            if (playSound === void 0) { playSound = true; }
             if (!this.isActive()) {
                 return;
             }
             var type = this.activeBlocks[0].getType();
             this.activeRotate = (((this.activeRotate - 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
+            if (playSound) {
+                audio_2["default"].blockRotate();
+            }
             this.activeBlocks.forEach(function (block) {
                 block.rotateLeft(_this.topLeft);
             });
@@ -1345,8 +1540,8 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
                     var block = _a[_i];
                     var x = block.getIndex().x + kick.x;
                     var y = block.getIndex().y + kick.y;
-                    if (x < 0 || x >= settings_3["default"].board.width ||
-                        y > settings_3["default"].board.height ||
+                    if (x < 0 || x >= settings_4["default"].board.width ||
+                        y > settings_4["default"].board.height || y < 0 ||
                         this_2.board[y][x] != null) {
                         canMove = false;
                         break;
@@ -1378,7 +1573,7 @@ define("objects/board", ["require", "exports", "objects/block", "settings", "ren
             }
         };
         Board.prototype.fastDrop = function (elapsed_time) {
-            this.fallCarryOver += settings_3["default"].fast_drop_rate * elapsed_time;
+            this.fallCarryOver += settings_4["default"].fast_drop_rate * elapsed_time;
         };
         Board.prototype.hardDrop = function () {
             while (this.isActive()) {
@@ -1476,7 +1671,7 @@ define("render/board_renderer", ["require", "exports", "render/block_renderer"],
     }());
     exports["default"] = BoardRenderer;
 });
-define("render/next_block_renderer", ["require", "exports", "settings", "graphics/sprite-sheet"], function (require, exports, settings_4, sprite_sheet_2) {
+define("render/next_block_renderer", ["require", "exports", "settings", "graphics/sprite-sheet"], function (require, exports, settings_5, sprite_sheet_2) {
     "use strict";
     exports.__esModule = true;
     var NextBlockRenderer = /** @class */ (function () {
@@ -1488,8 +1683,8 @@ define("render/next_block_renderer", ["require", "exports", "settings", "graphic
             blocks.forEach(function (group, index) {
                 group.forEach(function (block) {
                     var size = block.getSize();
-                    var x = settings_4["default"].next_box.x + (block.getIndex().x - Math.floor(settings_4["default"].board.width / 2) + 2) * size.width;
-                    var y = settings_4["default"].next_box.y + (block.getIndex().y + index * 2.5) * size.height + size.height;
+                    var x = settings_5["default"].next_box.x + (block.getIndex().x - Math.floor(settings_5["default"].board.width / 2) + 2) * size.width;
+                    var y = settings_5["default"].next_box.y + (block.getIndex().y + index * 2.5) * size.height + size.height;
                     _this.sprites.render({
                         center: { x: x, y: y },
                         size: block.getSize()
@@ -1501,51 +1696,274 @@ define("render/next_block_renderer", ["require", "exports", "settings", "graphic
     }());
     exports["default"] = NextBlockRenderer;
 });
+define("ai", ["require", "exports", "settings"], function (require, exports, settings_6) {
+    "use strict";
+    exports.__esModule = true;
+    var Moves;
+    (function (Moves) {
+        Moves[Moves["Rotate_Left"] = 0] = "Rotate_Left";
+        Moves[Moves["Rotate_Right"] = 1] = "Rotate_Right";
+        Moves[Moves["Left"] = 2] = "Left";
+        Moves[Moves["Right"] = 3] = "Right";
+        Moves[Moves["Drop"] = 4] = "Drop";
+    })(Moves = exports.Moves || (exports.Moves = {}));
+    var AI = /** @class */ (function () {
+        function AI(board) {
+            this.board = board;
+            this.next_moves = [];
+            this.move_speed = 175;
+            this.move_speed_carryover = 0;
+        }
+        AI.prototype.update = function (elapsedTime) {
+            var speed = this.move_speed - this.board.getLevel() * settings_6["default"].fall_rate_per_level / 2;
+            if (this.next_moves.length) {
+                this.move_speed_carryover += elapsedTime;
+                while (this.move_speed_carryover >= speed && this.next_moves.length) {
+                    this.move_speed_carryover -= speed;
+                    var move = this.next_moves.shift();
+                    switch (move) {
+                        case Moves.Rotate_Left:
+                            this.board.rotateLeft();
+                            break;
+                        case Moves.Rotate_Right:
+                            this.board.rotateRight();
+                            break;
+                        case Moves.Left:
+                            this.board.moveLeft();
+                            break;
+                        case Moves.Right:
+                            this.board.moveRight();
+                            break;
+                        case Moves.Drop:
+                            this.board.hardDrop();
+                    }
+                }
+            }
+            else {
+                this.findNextMove();
+            }
+        };
+        AI.prototype.findNextMove = function () {
+            var best = { score: 0, moves: 0, rotates: 0 };
+            var moves = 0; // -1 left, 1 right
+            var rotates = 0;
+            if (this.board.isActive()) {
+                for (var i = 0; i < 4; ++i) {
+                    // Check each rotation
+                    rotates++;
+                    this.board.rotateLeft(false);
+                    while (this.board.moveRight(false)) {
+                        //Start from right and work way left
+                        moves++;
+                    }
+                    var score = this.score();
+                    if (score >= best.score) {
+                        best = { score: score, moves: moves, rotates: rotates };
+                    }
+                    while (this.board.moveLeft(false)) {
+                        //Try each position and get a score
+                        moves--;
+                        var score_1 = this.score();
+                        if (score_1 >= best.score) {
+                            best = { score: score_1, moves: moves, rotates: rotates };
+                        }
+                    }
+                    // Reset block position
+                    while (moves < 0) {
+                        this.board.moveRight(false);
+                        moves++;
+                    }
+                }
+                // Reset block orientation
+                while (rotates > 0) {
+                    this.board.rotateRight(false);
+                    rotates--;
+                }
+                // Set next moves based on best score
+                if (best.rotates == 1) {
+                    this.next_moves.push(Moves.Rotate_Left);
+                }
+                if (best.rotates == 2) {
+                    this.next_moves.push(Moves.Rotate_Left);
+                    this.next_moves.push(Moves.Rotate_Left);
+                }
+                if (best.rotates == 3) {
+                    this.next_moves.push(Moves.Rotate_Right);
+                }
+                while (best.moves) {
+                    if (best.moves >= 0) {
+                        this.next_moves.push(Moves.Right);
+                        best.moves--;
+                    }
+                    else if (best.moves < 0) {
+                        this.next_moves.push(Moves.Left);
+                        best.moves++;
+                    }
+                }
+                this.next_moves.push(Moves.Drop);
+            }
+        };
+        AI.prototype.score = function () {
+            var score = 0;
+            var shadowBlocks = this.board.getShadowBlocks();
+            var shadowBlockHash = {};
+            var board = this.board.getBoard();
+            shadowBlocks.forEach(function (block) {
+                var y = block.getIndex().y;
+                if (shadowBlockHash.hasOwnProperty(y)) {
+                    shadowBlockHash[y].push(block.getIndex().x);
+                }
+                else {
+                    shadowBlockHash[y] = [block.getIndex().x];
+                }
+            });
+            for (var key in shadowBlockHash) {
+                var clear = true;
+                if (shadowBlockHash.hasOwnProperty(key)) {
+                    for (var j = 0; j < board[key].length; j++) {
+                        if (!(shadowBlockHash[key].includes(j)) && board[key][j] == null) {
+                            clear = false;
+                            break;
+                        }
+                    }
+                    if (clear) {
+                        score += 7.1; // We like to clear lines :)
+                    }
+                }
+            }
+            shadowBlocks.forEach(function (block) {
+                var y = block.getIndex().y;
+                if (y <= 2) {
+                    score == -99999; // Avoid game over!
+                    return -99999;
+                }
+                score += y; // get as low as possible
+                while (y < board.length - 1 && board[y + 1][block.getIndex().x] == null) {
+                    if (shadowBlockHash[y + 1] == null || !(shadowBlockHash[y + 1].includes(block.getIndex().x))) {
+                        score -= 2.99; // holes suck!
+                    }
+                    y++;
+                }
+            });
+            return score;
+        };
+        return AI;
+    }());
+    exports["default"] = AI;
+});
 /// <reference path="./graphics/graphics.ts" />
 /// <reference path="./utils/screens.ts" />
-define("game", ["require", "exports", "settings", "utils/input", "utils/scores", "utils/timer", "graphics/particles", "objects/board", "render/board_renderer", "render/next_block_renderer", "utils/scores"], function (require, exports, settings_5, input_1, scores_1, timer_1, particles_2, board_1, board_renderer_1, next_block_renderer_1, scores_2) {
+define("game", ["require", "exports", "settings", "utils/input", "utils/scores", "utils/timer", "graphics/particles", "objects/board", "render/board_renderer", "render/next_block_renderer", "utils/scores", "ai"], function (require, exports, settings_7, input_1, scores_1, timer_1, particles_3, board_1, board_renderer_1, next_block_renderer_1, scores_2, ai_1) {
     "use strict";
     exports.__esModule = true;
     var Game;
     (function (Game) {
         var character;
+        var characters = [
+            'yoshi',
+            'poochy',
+            'lakitu',
+            'raven',
+            'blargg',
+            'froggy'
+        ];
         var prevTime;
         var nextFrame = false;
         var elapsedTime = 0;
+        var speedUp = 1;
         var input = new input_1["default"]();
         var timer = new timer_1["default"]('div-timer');
         var board_renderer = new board_renderer_1["default"]();
         var nextBlockRenderer = new next_block_renderer_1["default"]();
         var board = new board_1["default"]();
-        input.register_press('ArrowUp', function () { return board.hardDrop(); });
-        input.register_hold('ArrowDown', function () { return board.fastDrop(elapsedTime); });
-        input.register_press('ArrowLeft', function () { return board.moveLeft(); });
-        input.register_press('ArrowRight', function () { return board.moveRight(); });
-        input.register_press('w', function () { return board.hardDrop(); });
-        // input.register_press('s', () => board.fastDrop(elapsedTime));
-        input.register_hold('s', function () { return board.fastDrop(elapsedTime); });
-        input.register_press('a', function () { return board.moveLeft(); });
-        input.register_press('d', function () { return board.moveRight(); });
-        input.register_press('q', function () { return board.rotateLeft(); });
-        input.register_press('e', function () { return board.rotateRight(); });
-        input.register_press('Escape', function () { return pause(); });
+        var ai;
+        var demoFlash = 1500;
+        var demoFlashCarryOver = 0;
+        var audioGameover = new Audio('./assets/music/gameover.mp3');
+        audioGameover.addEventListener('ended', function () {
+            this.currentTime = 0;
+            this.play();
+        }, false);
+        var music = new Audio('./assets/music/mainMenu.mp3');
+        music.addEventListener('ended', function () {
+            this.currentTime = 0;
+            this.play();
+        }, false);
+        var audio = null;
+        var audioCritical = null;
+        var critical = false;
+        function enableInput() {
+            input.register_press(settings_7["default"].controls['hard_drop'], function () { return board.hardDrop(); });
+            input.register_hold(settings_7["default"].controls['fast_drop'], function () { return board.fastDrop(elapsedTime); });
+            input.register_press(settings_7["default"].controls['left'], function () { return board.moveLeft(); });
+            input.register_press(settings_7["default"].controls['right'], function () { return board.moveRight(); });
+            input.register_press(settings_7["default"].controls['rotate_left'], function () { return board.rotateLeft(); });
+            input.register_press(settings_7["default"].controls['rotate_right'], function () { return board.rotateRight(); });
+            input.register_press(settings_7["default"].controls['pause'], function () { return pause(); });
+        }
+        function disableInput() {
+            input.unRegisterKey(settings_7["default"].controls['hard_drop']);
+            input.unRegisterKey(settings_7["default"].controls['fast_drop']);
+            input.unRegisterKey(settings_7["default"].controls['left']);
+            input.unRegisterKey(settings_7["default"].controls['right']);
+            input.unRegisterKey(settings_7["default"].controls['rotate_left']);
+            input.unRegisterKey(settings_7["default"].controls['rotate_right']);
+            input.unRegisterKey(settings_7["default"].controls['pause']);
+        }
         var backgroundImage;
-        function init() {
+        function interaction() {
+            window.removeEventListener('keypress', interaction);
+            window.removeEventListener('mousemove', interaction);
+            quit();
+        }
+        function init(char, demo, speed) {
+            if (char === void 0) { char = 'yoshi'; }
+            if (demo === void 0) { demo = false; }
+            if (speed === void 0) { speed = 1; }
             scores_1["default"].resetScore();
             timer.resetTime();
             board = new board_1["default"]();
-        }
-        function run(params) {
-            if (params === void 0) { params = { char: 'yoshi', init: false }; }
-            character = params.char;
+            speedUp = speed;
+            if (demo) {
+                ai = new ai_1["default"](board);
+                char = characters[Random.randomInt(0, 5)];
+                disableInput();
+                window.addEventListener('keypress', interaction);
+                window.addEventListener('mousemove', interaction);
+            }
+            else {
+                ai = null;
+                enableInput();
+            }
+            character = char;
             backgroundImage = new Graphics.Texture({
                 src: 'assets/player_backgrounds/' + character + '.png',
                 center: { x: Graphics.canvas.width / 2, y: Graphics.canvas.height / 2 },
                 size: { height: Graphics.canvas.height, width: Graphics.canvas.width }
             });
-            // (<HTMLAudioElement>document.getElementById('myMusic')).play();
+            if (audio) {
+                audio.pause();
+                audioCritical.pause();
+            }
+            audio = new Audio('./assets/music/' + character + '.mp3');
+            audioCritical = new Audio('./assets/music/' + character + '_critical.mp3');
+            audio.addEventListener('ended', function () {
+                this.currentTime = 0;
+                this.play();
+            }, false);
+            audioCritical.addEventListener('ended', function () {
+                this.currentTime = 0;
+                this.play();
+            }, false);
+            critical = false;
+            audio.play();
+        }
+        function run(params) {
+            if (params === void 0) { params = { char: 'yoshi', init: false, demo: false, speed: 1 }; }
+            music.pause();
+            music.currentTime = 0;
             if (params.init) {
-                init();
+                init(params.char, params.demo, params.speed);
             }
             nextFrame = true;
             prevTime = performance.now();
@@ -1553,22 +1971,32 @@ define("game", ["require", "exports", "settings", "utils/input", "utils/scores",
         }
         function pause() {
             nextFrame = false;
-            Screens.showScreen('sub-screen-pause');
+            Screens.showSubScreen('sub-screen-pause');
         }
         function quit() {
-            init();
+            nextFrame = false;
             Screens.showScreen('screen-main-menu');
         }
+        function leave() {
+            audio.pause();
+            audioCritical.pause();
+        }
         function updateInput(elapsedTime) {
-            input.update(elapsedTime);
+            if (!ai) {
+                input.update(elapsedTime);
+            }
+            if (ai) {
+                ai.update(elapsedTime);
+            }
         }
         function update(elapsedTime) {
             // Update Objects
+            demoFlashCarryOver += elapsedTime;
+            demoFlashCarryOver %= demoFlash * 2;
             board.update(elapsedTime);
-            particles_2["default"].update(elapsedTime);
+            particles_3["default"].update(elapsedTime);
             timer.updateTime(elapsedTime);
             if (board.isGameOver()) {
-                console.log('gameOver');
                 scores_2["default"].addScore(board.getScore());
                 gameOver();
             }
@@ -1576,16 +2004,40 @@ define("game", ["require", "exports", "settings", "utils/input", "utils/scores",
         function render() {
             Graphics.clear();
             backgroundImage.draw();
-            Graphics.writeText("Level: " + board.getLevel(), { x: settings_5["default"].info_box.x + settings_5["default"].pixel.width * 2, y: settings_5["default"].info_box.y + settings_5["default"].pixel.height * 6 });
-            Graphics.writeText("Time: " + timer.getTime(), { x: settings_5["default"].info_box.x + settings_5["default"].pixel.width * 30, y: settings_5["default"].info_box.y + settings_5["default"].pixel.height * 6 });
-            Graphics.writeText("Score: " + board.getScore(), { x: settings_5["default"].info_box.x + settings_5["default"].pixel.width * 2, y: settings_5["default"].info_box.y + settings_5["default"].pixel.height * 14 });
-            Graphics.writeText("Rows Cleared: " + board.getRowsCleared(), { x: settings_5["default"].info_box.x + settings_5["default"].pixel.width * 2, y: settings_5["default"].info_box.y + settings_5["default"].pixel.height * 22 });
+            var level = board.getLevel();
+            if (level == settings_7["default"].max_level) {
+                level = 'MAX';
+            }
+            Graphics.writeText("Level: " + level, { x: settings_7["default"].info_box.x + settings_7["default"].pixel.width * 2, y: settings_7["default"].info_box.y + settings_7["default"].pixel.height * 6 });
+            Graphics.writeText("Time: " + timer.getTime(), { x: settings_7["default"].info_box.x + settings_7["default"].pixel.width * 31, y: settings_7["default"].info_box.y + settings_7["default"].pixel.height * 6 });
+            Graphics.writeText("Score: " + board.getScore(), { x: settings_7["default"].info_box.x + settings_7["default"].pixel.width * 2, y: settings_7["default"].info_box.y + settings_7["default"].pixel.height * 14 });
+            Graphics.writeText("Rows Cleared: " + board.getRowsCleared(), { x: settings_7["default"].info_box.x + settings_7["default"].pixel.width * 2, y: settings_7["default"].info_box.y + settings_7["default"].pixel.height * 22 });
             nextBlockRenderer.render(board.getNextBlocks());
             board_renderer.render(board);
-            particles_2["default"].render();
+            particles_3["default"].render();
+            if (ai && demoFlashCarryOver > demoFlash) {
+                Graphics.writeText("Press any key to continue", { x: Graphics.canvas.width / 2.5, y: Graphics.canvas.width / 2 });
+            }
+            //Switch music
+            if (!board.isPopping() && !board.isGameOver()) { // Make sure the board isn't popping so the switch point isn't compromised while blocks are falling.
+                if (!board.isCritical()) {
+                    critical = false;
+                    audioCritical.pause();
+                    audioCritical.currentTime = 0;
+                    ;
+                    audio.play();
+                }
+                else if (board.isCritical()) {
+                    critical = true;
+                    audio.pause();
+                    audio.currentTime = 0;
+                    audioCritical.play();
+                }
+            }
         }
         function gameLoop(currTime) {
             elapsedTime = currTime - prevTime;
+            elapsedTime *= speedUp;
             updateInput(elapsedTime);
             update(elapsedTime);
             render();
@@ -1596,17 +2048,78 @@ define("game", ["require", "exports", "settings", "utils/input", "utils/scores",
         }
         function gameOver() {
             nextFrame = false;
-            scores_1["default"].saveScore();
+            audio.pause();
+            audioCritical.pause();
             document.getElementById('score-final').innerHTML = 'Your score was: ' + scores_1["default"].getScore().toString();
             Screens.showSubScreen('sub-screen-gameover');
+            if (ai) {
+                setTimeout(function () { Screens.showScreen('screen-game', { init: true, demo: true, speed: speedUp }); }, 2500);
+                return;
+            }
+            scores_1["default"].saveScore();
         }
-        Screens.addScreen({ id: 'screen-game', init: function () { return init(); }, run: function (params) { return run(params); } });
+        Screens.addScreen({ id: 'screen-game', init: null, run: function (params) { return run(params); }, leave: function () { return leave(); } });
         //(<HTMLDivElement>document.getElementById('button-start')).addEventListener('click', () => Screens.showScreen('screen-game'));
+        document.getElementById('button-demo').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: character, init: true, demo: true }); });
+        document.getElementById('button-demo-speed').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: character, init: true, demo: true, speed: 5 }); });
         Screens.addScreen({ id: 'sub-screen-pause' });
-        document.getElementById('button-resume').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: character }); });
+        document.getElementById('button-resume').addEventListener('click', function () { return Screens.showScreen('screen-game', { char: character, init: false }); });
         document.getElementById('button-quit').addEventListener('click', function () { return quit(); });
-        Screens.addScreen({ id: 'sub-screen-gameover' });
-        document.getElementById('button-replay').addEventListener('click', function () { init(); Screens.showScreen('screen-game'); });
-        document.getElementById('button-highscores2').addEventListener('click', function () { Screens.showScreen('screen-highscores'); });
+        Screens.addScreen({ id: 'sub-screen-gameover', run: function () { audioGameover.currentTime = 0; audioGameover.play(); }, leave: function () { return audioGameover.pause(); } });
+        document.getElementById('button-replay').addEventListener('click', function () {
+            audioGameover.pause();
+            audioGameover.currentTime = 0;
+            Screens.showScreen('screen-game', { char: character, init: true });
+        });
+        document.getElementById('button-highscores2').addEventListener('click', function () {
+            Screens.showScreen('screen-highscores');
+            audioGameover.pause();
+            audioGameover.currentTime = 0;
+        });
+        Screens.addScreen({ id: 'screen-options', init: function () { }, run: function () {
+                document.getElementById('button-left').innerHTML = 'Left: ' + settings_7["default"].controls['left'];
+                document.getElementById('button-right').innerHTML = 'Right: ' + settings_7["default"].controls['right'];
+                document.getElementById('button-rotate-right').innerHTML = 'Rotate Right: ' + settings_7["default"].controls['rotate_right'];
+                document.getElementById('button-rotate-left').innerHTML = 'Rotate Left: ' + settings_7["default"].controls['rotate_left'];
+                document.getElementById('button-fast-drop').innerHTML = 'Fast Drop: ' + settings_7["default"].controls['fast_drop'];
+                document.getElementById('button-hard-drop').innerHTML = 'Hard Drop: ' + settings_7["default"].controls['hard_drop'];
+                document.getElementById('button-pause').innerHTML = 'Pause: ' + settings_7["default"].controls['pause'];
+            } });
+        document.getElementById('button-options').addEventListener('click', function () { return Screens.showScreen('screen-options'); });
+        document.getElementById('button-right').addEventListener('click', function () { return Screens.showScreen('sub-screen-control', 'right'); });
+        document.getElementById('button-left').addEventListener('click', function () { return Screens.showScreen('sub-screen-control', 'left'); });
+        document.getElementById('button-rotate-right').addEventListener('click', function () { return Screens.showScreen('sub-screen-control', 'rotate_right'); });
+        document.getElementById('button-rotate-left').addEventListener('click', function () { return Screens.showScreen('sub-screen-control', 'rotate_left'); });
+        document.getElementById('button-fast-drop').addEventListener('click', function () { return Screens.showScreen('sub-screen-control', 'fast_drop'); });
+        document.getElementById('button-hard-drop').addEventListener('click', function () { return Screens.showScreen('sub-screen-control', 'hard_drop'); });
+        document.getElementById('button-pause').addEventListener('click', function () { return Screens.showScreen('sub-screen-control', 'pause'); });
+        document.getElementById('button-back-options').addEventListener('click', function () { return Screens.showScreen('screen-main-menu'); });
+        function timeOut() { Screens.showScreen('screen-game', { char: character, init: true, demo: true }); }
+        var time;
+        function resetTimer() {
+            clearTimeout(time);
+            time = setTimeout(timeOut, 10000);
+        }
+        Screens.addScreen({ id: 'screen-main-menu', init: function () { return resetTimer(); }, run: function () {
+                music.play();
+                document.onmousemove = resetTimer;
+                document.onkeypress = resetTimer;
+            }, leave: function () {
+                document.onmousemove = null;
+                document.onkeypress = null;
+                clearTimeout(time);
+            } });
+        Screens.showScreen('screen-main-menu');
+        var control = null;
+        Screens.addScreen({ id: 'sub-screen-control', init: function () { }, run: function (ctrl) {
+                control = ctrl;
+                window.addEventListener('keyup', setKey);
+            } });
+        function setKey(e) {
+            disableInput();
+            settings_7["default"].setControls(control, e.key);
+            window.removeEventListener('keyup', setKey);
+            Screens.showScreen('screen-options');
+        }
     })(Game || (Game = {}));
 });

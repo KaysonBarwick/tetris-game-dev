@@ -31,7 +31,7 @@ export default class Block extends Object {
     }
 
     public fall(){
-        if(this.index.y < Settings.board.height + 2){
+        if(this.index.y < Settings.board.height + 1){
             this.index.y++;
         }
     }

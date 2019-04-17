@@ -16,6 +16,15 @@ export default class Input {
         delete this.my_keys[e.key];
     }
 
+    unRegisterKey(key: string){
+        if(this.handlers[key]){
+            delete this.handlers[key];
+        }
+        if(this.press_handlers[key]){
+            delete this.press_handlers[key];
+        }
+    }
+
     register_hold(key: string, handler: {(elapsed_time: DOMHighResTimeStamp): void}){
         this.handlers[key] = handler;
     }

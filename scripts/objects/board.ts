@@ -4,10 +4,12 @@ import Block, { BlockTypes } from './block';
 
 import Settings from '../settings';
 import BlockAnimator from '../render/block_animator';
-import Particles from '../graphics/particles'
+import Particles from '../graphics/particles';
+import Audio from '../utils/audio';
 
 export default class Board {
     private board: Block[][] = [];
+    private nextTypes: BlockTypes[] = [];
     private nextBlocks: Block[][] = [];
     private toFall: Block[] = [];
 
@@ -41,6 +43,15 @@ export default class Board {
     // ------------Getters------------
     public isActive(): boolean {
         return this.activeBlocks.length > 0;
+    }
+
+    public isCritical(): boolean {
+        for(let i = 0; i < this.board[6].length; ++i){
+            if(this.board[6][i] != null){
+                return true;
+            }
+        }
+        return false;
     }
 
     public getBoard(): Block[][] {
@@ -113,10 +124,14 @@ export default class Board {
         return gameOver;
     }
 
+    public isPopping(): boolean{
+        return this.blockAnimator.isPopping();
+    }
+
     //
     // ------------Game actions------------
     public update(elapsed_time: DOMHighResTimeStamp){
-        this.level = Math.floor(this.cleared / Settings.rows_per_level);
+        this.level = Math.min(Settings.max_level, Math.floor(this.cleared / Settings.rows_per_level));
 
         this.blockAnimator.update(elapsed_time);
         if(this.blockAnimator.isPopping()){
@@ -139,9 +154,18 @@ export default class Board {
                     groups[id] = [block];
                 }
             });
+            if(this.toFall.length > 0){
+                Audio.blockLand();
+            }
             while(this.toFall.length > 0){
                 this.toFall.forEach(block => {
-                    block.fall();
+                    if(block.getIndex().y + 1 < this.board.length && this.board[block.getIndex().y + 1][block.getIndex().x] == null){
+                        block.fall();
+                    }
+                    else{
+                        this.board[block.getIndex().y][block.getIndex().x] = block;
+                        this.toFall.splice(this.toFall.indexOf(block), 1);
+                    }
                 });
                 let locking = true;
                 while(locking){
@@ -225,23 +249,41 @@ export default class Board {
 
         
         if(popped == 1){
+            //Audio.fanfare(0);
             this.score += 40 * (this.level + 1)
         }
         if(popped == 2){
+            Audio.fanfare(1);
             this.score += 100 * (this.level + 1)
         }
         if(popped == 3){
+            Audio.fanfare(2);
             this.score += 300 * (this.level + 1)
         }
         if(popped == 4){
+            Audio.fanfare(3);
             this.score += 1200 * (this.level + 1)
         }
+    }
+
+    private nextType(): BlockTypes {
+        if(this.nextTypes.length == 0){
+            for(let i = 0; i < 7; ++i){
+                this.nextTypes.push(i);
+            }
+            //scramble
+            for (let i = this.nextTypes.length - 1; i > 0; i--) { //https://stackoverflow.com/questions/6274339/how-can-i-shuffle-an-array
+                const j = Math.floor(Math.random() * (i + 1));
+                [this.nextTypes[i], this.nextTypes[j]] = [this.nextTypes[j], this.nextTypes[i]];
+            }
+        }
+        return this.nextTypes.shift();
     }
 
     private nextBlock(): Block[] {
         // Add a blocks to next
         while(this.nextBlocks.length <= Settings.next_block_count){
-            let type = Random.randomInt(0, 6);
+            let type = this.nextType();
             let middle = Math.floor(Settings.board.width / 2);
 
             this.activeRotate = 0;
@@ -323,19 +365,19 @@ export default class Board {
         else {
             // Deactivate blocks by moving them to board
             this.activeBlocks.forEach(block => {
-                console.log(this, block);
                 this.board[block.getIndex().y][block.getIndex().x] = block;
             });
             Particles.addBlockPlace(this.activeBlocks);
+            Audio.blockLand();
             this.activeBlocks = [];
         }
     }
 
     //
     // ------------Player Actions------------
-    public moveLeft(){
+    public moveLeft(playSound: boolean = true): boolean{
         if(!this.isActive()){
-            return;
+            return false;
         }
         let canMove: boolean = true;
         this.activeBlocks.forEach(block => {
@@ -350,12 +392,17 @@ export default class Board {
                 block.moveLeft();
             });
             this.topLeft.x--;
+            if(playSound){
+                Audio.blockMove();
+            }
+            return true;
         }
+        return false;
     }
 
-    public moveRight(){
+    public moveRight(playSound: boolean = true): boolean{
         if(!this.isActive()){
-            return;
+            return false;
         }
         let canMove: boolean = true;
         this.activeBlocks.forEach(block => {
@@ -370,13 +417,22 @@ export default class Board {
                 block.moveRight();
             });
             this.topLeft.x++;
+            if(playSound){
+                Audio.blockMove();
+            }
+            return true;
         }
+        return false;
     }
 
-    public rotateRight(){
+    public rotateRight(playSound: boolean = true){
         if(!this.isActive()){
             return;
         }
+        if(playSound){
+            Audio.blockRotate();
+        }
+
         let type = this.activeBlocks[0].getType();
         this.activeRotate = (((this.activeRotate + 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
         
@@ -426,7 +482,7 @@ export default class Board {
                 let y = block.getIndex().y + kick.y;
 
                 if(x < 0 || x >= Settings.board.width ||
-                  y > Settings.board.height ||
+                  y >= this.board.length || y < 0 ||
                   this.board[y][x] != null){
                     canMove = false;
                     break;
@@ -452,12 +508,16 @@ export default class Board {
         }
     }
 
-    public rotateLeft(){
+    public rotateLeft(playSound: boolean = true){
         if(!this.isActive()){
             return;
         }
         let type = this.activeBlocks[0].getType();
         this.activeRotate = (((this.activeRotate - 1) % 4) + 4) % 4; //https://stackoverflow.com/questions/4467539/javascript-modulo-gives-a-negative-result-for-negative-numbers
+        
+        if(playSound){
+            Audio.blockRotate();
+        }
 
         this.activeBlocks.forEach(block =>{
             block.rotateLeft(this.topLeft);
@@ -504,7 +564,7 @@ export default class Board {
                 let y = block.getIndex().y + kick.y;
 
                 if(x < 0 || x >= Settings.board.width ||
-                  y > Settings.board.height ||
+                  y > Settings.board.height || y < 0 ||
                   this.board[y][x] != null){
                     canMove = false;
                     break;

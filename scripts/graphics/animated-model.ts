@@ -17,6 +17,10 @@ export default class AnimatedModel {
         });
     }
 
+    public getObject(): Object {
+        return this.object;
+    }
+
     public isDone(): boolean {
         return this.count >= this.times;
     }
