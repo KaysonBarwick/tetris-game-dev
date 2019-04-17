@@ -4,7 +4,7 @@ var path = require('path');
 var express = require('express');
 var app = express();
 
-var htmlPath = path.join(__dirname, 'html');
+var htmlPath = path.join(__dirname, 'game');
 
 app.use(express.static(htmlPath));
 
